@@ -33,7 +33,6 @@
             if(!this.isListening && pFingerList.length >= 2) {
                 this._addListenedFingers(pFingerList[0], pFingerList[1]);
        
-                // console.log('s ' + this._getFingersDistance())
                 this._lastDistance = this._getFingersDistance();
                 this._startDistance = this._lastDistance;
                 this.data.totalDistance = 1;

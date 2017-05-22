@@ -14,7 +14,7 @@ var Tap = (function (_super) {
         nbTapMin: 0,
         nbTapMax: 50,
         tapInterval: 300,
-        maxDistanceMoving: 10
+        distanceThreshold: 0.5
     };
 
     function Tap(pOptions) {
@@ -55,13 +55,14 @@ var Tap = (function (_super) {
             this._removeAllListenedFingers();
 
             if(pFinger.getTotalTime() < this.options.tapInterval &&
-                pFinger.getDistance() < this.options.maxDistanceMoving) {
+               pFinger.getDistance() < this.options.distanceThreshold*Utils.PPCM) {
                 this.data.lastTapTimestamp = pFinger.getTime();
                 this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
                 this.data.target = pFinger.getTarget();
                 this.data.nbTap++;
 
-                if(this.data.nbTap >= this.options.nbTapMin && this.data.nbTap <= this.options.nbTapMax) {
+                if(this.data.nbTap >= this.options.nbTapMin && 
+                   this.data.nbTap <= this.options.nbTapMax) {
                     this.fire(_super.EVENT_TYPE.instant, this.data);
                 }
             }

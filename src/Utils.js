@@ -50,7 +50,7 @@ var Utils = {
     },
 
     getAngle: function(x, y) {
-        return Math.atan2(x, y);
+        return (Math.atan2(x, y)*180)/Math.PI;
     },
 
     getDistance: function(x, y) {

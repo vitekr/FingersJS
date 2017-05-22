@@ -10,8 +10,8 @@ var Hold = (function (_super) {
    
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        distanceThreshold: 0.5,
-        duration: 600,
+        distanceThreshold: 0.5,             // in cm
+        duration: 600,                      // in ms
         preventCombinedGestures: true
     };
 

@@ -9,13 +9,13 @@ FingerJS is partially re-written fork of the original [Fingers.js](https://githu
 
 
 ## Features
-- Light library (less than 4kb minified and gzipped)
-- Work with mouse devices (1 finger) and touch devices (multiple fingers)
-- Detect action gestures (Tap, MultipleTap, Hold, Swipe, Pinch) with as many number as you want
+- Light library (less than 15 kB minified and gzipped)
+- Works with touch devices (multiple fingers)
+- Detect action gestures (Tap, MultipleTap, Hold, Swipe, Pinch) with as many fingers as you want
 - Detect movement gestures (Drag, Rotate, Scale)
 - Detect raw gestures (Fingers object managed)
 - __Multiple gestures in same time__ (You can drag 2 different objects, rotate a third and swipe a fourth in same time)
-- Easy to add your [custom gestures](/src/gestures/README.md).
+- Easy to add your custom gestures.
 - AMD/CommonJS support
 
 
@@ -27,7 +27,7 @@ FingersJS is simple to use. Just create an instance of Fingers on the wanted DOM
     var gesture1 = fingers.addGesture(Fingers.gesture.Tap);
     var gesture2 = fingers.addGesture(Fingers.gesture.Hold);
 
-Gestures can have many handlers
+Gestures can have multiple handlers:
 
     var element = document.getElementById('el_id');
     var fingers = new Fingers(element);
@@ -39,7 +39,7 @@ Gestures can have many handlers
         alert('Tap 2');
     });
 
-Gestures handling mathods are chainable
+Gestures handling methods are chainable:
 
     var element = document.getElementById('el_id');
     new Fingers(element)
@@ -48,23 +48,10 @@ Gestures handling mathods are chainable
         .addHandler(function(eventType, data, fingerList) {alert('Tap 2');})
         .addHandler(function(eventType, data, fingerList) {alert('Tap 3');});
 
-## Gesture
-The following gestures are detected;
-
-- hold (1 .. N fingers)
-- tap (1 .. N fingers) and multiple taps (1 .. N successive taps)
-- swipe (1 .. N fingers)
-- Pinch (1 .. N fingers)
-- drag (1 finger)
-- rotate (2 fingers)
-- scale (2 fingers)
-- transform (rotate and scale) (2 fingers)
-- raw (each finger is seen independently)
-
-See [custom gestures](/src/gestures/README.md) for gesture details.
 
 ## Finger
-Finger object is accessible from Gesture events<br/>
+Finger object is accessible from ```Gesture``` events
+
 It contains all the informations about the finger from its beginning until its end.
 It provides informations about:
 - it time
@@ -74,6 +61,256 @@ It provides informations about:
 
 Informations are always available from Finger start or from Finger last move (ex: current velocity and average velocity)
 
+# Gestures
+
+## Gesture events
+
+There are 2 kinds of gestures:
+
+- action gestures: fire instant events 
+- movement gestures: fire start, move then end events
+
+Each event contains:
+
+- its type (instant, start, move, end)
+- its data (specific for each gesture)
+- the list of concerned Fingers objects
+
+The following gestures are detected:
+
+- hold (1 .. N fingers), instant
+- tap (1 .. N fingers) and multiple taps (1 .. N successive taps), instant
+- swipe (1 .. N fingers), instant
+- Pinch (1 .. N fingers), instant
+- drag (1 finger)
+- rotate (2 fingers)
+- scale (2 fingers)
+- transform (rotate and scale) (2 fingers)
+- raw (each finger is seen independently)
+
+
+## Gesture Options and Data
+Each gesture has his set of options and manages its own data.
+
+### Raw gesture
+#### Options
+    {
+        nbMaxFingers: Number.MAX_VALUE
+    };
+
+
+### Hold
+#### Options
+    {
+        nbFingers: 1,
+        distanceThreshold: 0.5,         // in cm
+        duration: 600,                  // in ms
+        preventCombinedGestures: true
+    };
+#### Data
+- target (name of the target element)
+
+### Tap
+
+#### Options
+    {
+        nbFingers: 1,
+        nbTapMin: 0,
+        nbTapMax: 50,
+        tapInterval: 300,
+        distanceThreshold: 10
+    };
+#### Data
+- nbTap (number of taps)
+- lastTapTimestamp
+- tapPosition
+- target
+
+### Drag
+#### Options
+    {
+        nbFingers: 1,
+        distanceThreshold: 0.2,         // in cm
+        preventCombinedGestures: true
+    }
+#### Data
+No data
+
+### Swipe
+#### Options
+    {
+        nbFingers: 1,
+        swipeVelocityX: 0.6,
+        swipeVelocityY: 0.6
+    };
+#### Data
+- direction
+- velocity
+- target
+
+### Pinch
+
+Pinch fires the event after the gesture is completed.
+#### Options
+    {
+        pinchInDetect: 0.6,
+        pinchOutDetect: 1.4
+    };
+#### Data
+- grow ('in' or 'out')
+- scale
+- target
+
+### Rotate
+
+#### Options
+    {
+        angleThreshold: 5   // in degrees
+    }
+
+#### Data
+- totalRotation (rotation since the gesture start)
+- deltaRotation (rotation since the last gesture move)
+
+#### Internal variables
+- ```_startAngle```
+- ```_lastAngle```
+
+Note, that the angles are in degrees.
+
+### Scale
+#### Options
+    {
+        distanceThreshold: 2.5 // in cm
+    }
+#### Data
+- totalDistance (distance since the gesture start)
+- deltaDistance (distance between the last two gesture events)
+
+#### Internal variables
+- ```_startDistance```
+- ```_lastDistance```
+
+### Transform
+#### Options
+    {
+        distanceThreshold: 2.5,
+        angleThreshold: 4
+    };
+#### Data
+- totalRotation
+- deltaRotation
+- totalDistance
+- deltaDistance
+- target
+
+#### Internal variables
+- ```_startDistance```
+- ```_lastDistance```
+
+
+## Usage
+
+#### Example
+    var element = document.getElementById('el_id');
+    new Fingers(element).addGesture(Fingers.gesture.Tap, {
+         nbFingers: 3,
+         tapInterval: 400
+     });
+
+
+#### Action gesture event exemple
+    var element = document.getElementById('el_id');
+    new Fingers(element)
+        .addGesture(Fingers.gesture.Tap)
+        .addHandler(function(eventType, data, fingerList) {
+            //eventType === Fingers.Gesture.EVENT_TYPE.instant
+        });
+
+#### Movement gesture event exemple
+    var element = document.getElementById('el_id');
+    new Fingers(element)
+        .addGesture(Fingers.gesture.Transform).addHandler(function(pEventType, pData, pFingers) {
+            switch(pEventType) {
+                case Fingers.Gesture.EVENT_TYPE.start:
+                    ...
+                    break;
+                case Fingers.Gesture.EVENT_TYPE.move:
+                    ...
+                    break;
+                case Fingers.Gesture.EVENT_TYPE.end:
+                    ...
+                    break;
+            }
+        });
+
+## Custom Gesture
+Its really easy to create you own ```Gesture```. You need to define its parameters, output data (optional) and handlers for each of the states of the gesture's life-cycle. 
+
+#### Create your Gesture class
+    var MyGesture = (function (_super) {
+
+        //Constructor
+        function MyGesture(pOptions) {
+            _super.call(this, pOptions, {
+                option_1: "default_value",
+                option_2: "default_value"
+            });
+
+            this.data = {
+                myData1: ...
+                myData2: ...
+            }
+        }
+
+        Fingers.__extend(MyGesture.prototype, _super.prototype, {
+
+            _onFingerAdded: function(pNewFinger, pFingerList) {
+                //If gesture is already listening fingers
+                if(!this.isListening) {
+
+                    //Listening of the fingers
+                    this._addListenedFinger(pNewFinger);
+
+                    //Event fire
+                    this.fire(_super.EVENT_TYPE.start, this.data);
+                }
+            },
+
+            _onFingerUpdate: function(pFinger) {
+                //Event fire
+                this.fire(_super.EVENT_TYPE.move, this.data);
+            },
+
+            _onFingerRemoved: function(pFinger) {
+                if(this.isListenedFinger(pFinger)) {
+
+                    //Event fire
+                    this.fire(_super.EVENT_TYPE.end, this.data);
+
+                    //Stop listening finger
+                    this._removeAllListenedFingers();
+                }
+            }
+        });
+
+        return MyGesture;
+    })(Fingers.Gesture);
+
+    Fingers.gesture.MyGesture = MyGesture;
+
+#### Use it with Fingers
+    var element = document.getElementById('el_id');
+    new Fingers(element)
+        .addGesture(Fingers.gesture.MyGesture, {
+            option_1: "value_1",
+            option_2: "value_2"
+        })
+        .addHandler(function(eventType, data, fingerList) {
+            alert('My Gesture appends');
+        });
+
+
 ## Examples
 Examples are available in [/tests/manual folder](/tests/manual).
-Try if on PC (but only with on finger) or on a Smartphone / Tablet with all your fingers, then enjoy it.
+Try if on PC or on a Smartphone / Tablet with all your fingers, then enjoy it.

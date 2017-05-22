@@ -1,6 +1,8 @@
 
 # Fingers.js Gestures
 
+Warning: The documentation here is not up-to-date
+
 ## Options
 Each gesture has his set of options
 

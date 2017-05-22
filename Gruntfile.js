@@ -9,7 +9,7 @@ module.exports = function(grunt) {
                 ' * <%= pkg.homepage %>\n' +
                 ' *\n' +
                 ' * Copyright (c) <%= grunt.template.today("yyyy") %> <%= pkg.author.name %> <<%= pkg.author.email %>>;\n' +
-                ' * Licensed under the <%= _.pluck(pkg.licenses, "type").join(", ") %> license */\n\n'
+                ' * Licensed under the MIT license */\n\n'
         },
         concat: {
             options: {

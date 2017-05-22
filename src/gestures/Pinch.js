@@ -20,7 +20,8 @@ var Pinch = (function (_super) {
 
         this.data = {
             grow: null,
-            scale: 1
+            scale: 1,
+            target: null
         };
     }
 
@@ -34,6 +35,7 @@ var Pinch = (function (_super) {
                 this._addListenedFingers(pFingerList[0], pFingerList[1]);
 
                 this._startDistance = this._getFingersDistance();
+                this.data.target = pFinger.getTarget();
             }
         },
 

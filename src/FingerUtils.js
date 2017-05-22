@@ -39,5 +39,3 @@ var FingerUtils = {
 };
 
 Fingers.FingerUtils = FingerUtils;
-
-

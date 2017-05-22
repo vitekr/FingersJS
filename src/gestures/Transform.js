@@ -8,12 +8,11 @@
  * @return {Transform}
  */
 
-
 var Transform = (function (_super) {
-
+    // TODO: add thresholds
     var DEFAULT_OPTIONS = {
-        rotation: true,
-        scale: true
+        distanceThreshold: 2.5,
+        angleThreshold: 4
     };
 
     function Transform(pOptions) {
@@ -22,8 +21,9 @@ var Transform = (function (_super) {
         this.data = {
             totalRotation: 0,
             deltaRotation: 0,
-            totalScale: 1,
-            deltaScale: 1
+            totalDistance: 0,
+            deltaDistance: 0,
+            target: null
         };
     }
 
@@ -36,49 +36,59 @@ var Transform = (function (_super) {
         data: null,
 
         _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= 2) {
+            if(!this.isListening && pFingerList.length == 2) {
                 this._addListenedFingers(pFingerList[0], pFingerList[1]);
 
-                if(this.options.rotation) {
-                    this._lastAngle = this._getFingersAngle();
-                    this._startAngle = this._lastAngle;
-                    this.data.totalRotation = 0;
-                    this.data.deltaRotation = 0;
-                }
 
-                if(this.options.scale) {
-                    this._lastDistance = this._getFingersDistance();
-                    this._startDistance = this._lastDistance;
-                    this.data.totalScale = 1;
-                    this.data.deltaScale = 1;
-                }
+                this._lastAngle = this._getFingersAngle();
+                this._startAngle = this._lastAngle;
+                // this.data.totalRotation = 0;
+                // this.data.deltaRotation = 0;
+
+                this._lastDistance = this._getFingersDistance();
+                this._startDistance = this._lastDistance;
+                // this.data.totalDistance = 0;
+                // this.data.deltaDistance = 0;
+
+
+                //target element is under the first finger
+                this.data.target = pFingerList[0].getTarget();   
 
                 this.fire(_super.EVENT_TYPE.start, this.data);
             }
         },
 
         _onFingerUpdate: function(pFinger) {
-            if(this.options.rotation) {
-                var newAngle = this._getFingersAngle();
-                this.data.totalRotation = this._startAngle - newAngle;
-                this.data.deltaRotation = this._lastAngle - newAngle;
-                this._lastAngle = newAngle;
+         
+            var newAngle = this._getFingersAngle();
+            this.data.totalRotation = this._startAngle - newAngle;
+            this.data.deltaRotation = this._lastAngle - newAngle;
+            this._lastAngle = newAngle;
+
+            var newDistance = this._getFingersDistance();
+            this.data.totalDistance = this._startDistance - newDistance;
+            this.data.deltaDistance = this._lastDistance - newDistance;
+            this._lastDistance = newDistance;
+            
+
+            if(Math.abs(this.data.totalDistance) > this.options.distanceThreshold*Utils.PPCM) {
+                this.data.totalRotation = 0;
+                this.data.deltaRotation = 0;
+                this.fire(_super.EVENT_TYPE.move, this.data);  
             }
 
-            if(this.options.scale) {
-                var newDistance = this._getFingersDistance();
-                this.data.totalScale = newDistance / this._startDistance;
-                this.data.deltaScale = newDistance / this._lastDistance;
-                this._lastDistance = newDistance;
+
+           if(Math.abs(this.data.totalRotation) > this.options.angleThreshold) {
+                this.data.totalDistance = 0;
+                this.data.deltaScale = 0;
+                this.fire(_super.EVENT_TYPE.move, this.data);  
             }
 
-            this.fire(_super.EVENT_TYPE.move, this.data);
         },
 
         _onFingerRemoved: function(pFinger) {
-            this.fire(_super.EVENT_TYPE.end, this.data);
-
             this._removeAllListenedFingers();
+            this.fire(_super.EVENT_TYPE.end, this.data);
         },
 
         _getFingersAngle: function() {
@@ -94,56 +104,3 @@ var Transform = (function (_super) {
 })(Fingers.Gesture);
 
 Fingers.gesture.Transform = Transform;
-
-
-/**
- * @module gestures
- *
- * @class Rotate
- * @constructor
- * @param {Object} pOptions
- * @param {Function} pHandler
- * @return {Rotate}
- */
-
-var Rotate = (function (_super) {
-
-    function Rotate(pOptions) {
-        pOptions = pOptions || {};
-        pOptions.rotation = true;
-        pOptions.scale = false;
-        _super.call(this, pOptions);
-    }
-
-    Fingers.__extend(Rotate.prototype, _super.prototype);
-
-    return Rotate;
-})(Transform);
-
-Fingers.gesture.Rotate = Rotate;
-
-
-/**
- * @module gestures
- *
- * @class Scale
- * @constructor
- * @param {Object} pOptions
- * @return {Pinch}
- */
-
-var Scale = (function (_super) {
-
-    function Scale(pOptions) {
-        pOptions = pOptions || {};
-        pOptions.rotation = false;
-        pOptions.scale = true;
-        _super.call(this, pOptions);
-    }
-
-    Fingers.__extend(Scale.prototype, _super.prototype);
-
-    return Scale;
-})(Transform);
-
-Fingers.gesture.Scale = Scale;

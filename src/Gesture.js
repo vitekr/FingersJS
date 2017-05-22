@@ -25,7 +25,6 @@ Gesture.prototype = {
 
     options: null,
     _handlerList: null,
-    _handlerListSize: 0,
 
     isListening: false,
     listenedFingers: null,
@@ -33,28 +32,31 @@ Gesture.prototype = {
     /*---- Handlers ----*/
     addHandler: function(pHandler) {
         this._handlerList.push(pHandler);
-        this._handlerListSize++;
-
         return this;
     },
 
     removeHandler: function(pHandler) {
         var index = this._handlerList.indexOf(pHandler);
         this._handlerList.splice(index, 1);
-        this._handlerListSize--;
-
         return this;
     },
 
     removeAllHandlers: function() {
-        this._handlerList.length = 0;
-        this._handlerListSize = 0;
-
+        this._handlerList = [];
         return this;
     },
 
+    getHandlers: function() {
+        return this._handlerList;
+    },
+
+    getHandler: function(pHandler) {
+        var index = this._handlerList.indexOf(pHandler);
+        return this._handlerList[index];
+    },
+
     fire: function(pType, pData) {
-        for(var i=0; i<this._handlerListSize; i++) {
+        for(var i=0, size = this._handlerList.length; i<size; i++) {
             this._handlerList[i](pType, pData, this.listenedFingers);
         }
     },
@@ -101,11 +103,18 @@ Gesture.prototype = {
         var finger;
         for(var i= 0, size=this.listenedFingers.length; i<size; i++) {
             finger = this.listenedFingers[i];
-
+            // FIXME HERE FIRST: 
+            // console.log('removing finger', finger.id, finger.state, finger._handlerList)
+            console.log('before' + finger.id + ", " + finger.state, finger._handlerList);
             finger._removeHandlerObject(this);
+            // if(finger._handlerList.length === 0) {
+            //     this._removeAllListenedFingers();
+            // }
+            // FIXME: 
+            console.log('after' + finger.id + ", " + finger.state, finger._handlerList);
         }
 
-        this.listenedFingers.length = 0;
+        this.listenedFingers = [];
         this.isListening = false;
     },
 

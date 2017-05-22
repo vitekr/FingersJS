@@ -10,9 +10,10 @@
  * @return {Finger}
  */
 
-var Finger = function(pId, pTimestamp, pX, pY) {
+var Finger = function(pId, pTimestamp, pX, pY, target) {
     this.id = pId;
     this.state = Finger.STATE.ACTIVE;
+    this.target = target;
     this._handlerList = [];
 
     this.startP = new Position(pTimestamp, pX, pY);
@@ -51,7 +52,7 @@ Finger.STATE = {
 };
 
 Finger.CONSTANTS = {
-    inactivityTime: 100
+    inactivityTime: 200
 };
 
 Finger.prototype = {
@@ -67,22 +68,19 @@ Finger.prototype = {
     nbListeningInstances: 0,
     _cacheArray: null,
     _handlerList: null,
-    _handlerListSize: 0,
 
     _addHandlerObject: function(pHandlerObject) {
         this._handlerList.push(pHandlerObject);
-        this._handlerListSize = this._handlerList.length;
     },
 
     _removeHandlerObject: function(pHandlerObject) {
         var index = this._handlerList.indexOf(pHandlerObject);
         this._handlerList.splice(index, 1);
-        this._handlerListSize = this._handlerList.length;
+        console.log('removed handler: ', pHandlerObject);
     },
 
     _clearHandlerObjects: function() {
-        this._handlerList.length = 0;
-        this._handlerListSize = 0;
+        this._handlerList = [];
     },
 
     _setCurrentP: function(pTimestamp, pX, pY, pForceSetter) {
@@ -92,21 +90,19 @@ Finger.prototype = {
             this.previousP.copy(this.currentP);
             this.currentP.set(pTimestamp, pX, pY);
 
-            for(var i= 0; i<this._handlerListSize; i++) {
+            for(var i= 0; i<this._handlerList.length; i++) {
                 this._handlerList[i]._onFingerUpdate(this);
             }
         }
     },
 
     _setEndP: function(pTimestamp) {
+        this.state = Finger.STATE.REMOVED;
         //Only update if end event is not "instant" with move event
         if((pTimestamp - this.getTime()) > Finger.CONSTANTS.inactivityTime) {
-            this._setCurrentP(pTimestamp, this.getX(), this.getY(), true);
+            this._setCurrentP(pTimestamp, this.getX(), this.getY(), false);
         }
-
-        this.state = Finger.STATE.REMOVED;
-
-        var handlerList = this._handlerList.slice(0);
+        var handlerList = this._handlerList.slice();
         for(var i= 0; i<handlerList.length; i++) {
             handlerList[i]._onFingerRemoved(this);
         }
@@ -143,6 +139,10 @@ Finger.prototype = {
 
     getY: function() {
         return this.currentP.y;
+    },
+
+    getTarget: function() {
+        return this.target;
     },
 
     /*---- distance ----*/
@@ -249,8 +249,6 @@ Finger.prototype = {
 
 Fingers.Finger = Finger;
 
-
-
 var Position = function(pTimestamp, pX, pY) {
     this.set(pTimestamp, pX, pY);
 };
@@ -288,5 +286,3 @@ Position.prototype = {
 };
 
 Fingers.Position = Position;
-
-

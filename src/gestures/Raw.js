@@ -11,7 +11,7 @@
 var Raw = (function (_super) {
 
     var DEFAULT_OPTIONS = {
-        nbMaxFingers: Number.MAX_VALUE
+        nbMaxFingers: 50
     };
 
     function Raw(pOptions) {

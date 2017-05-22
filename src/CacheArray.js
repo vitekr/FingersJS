@@ -30,7 +30,7 @@ CacheArray.prototype = {
     },
 
     clearCache: function() {
-        this._cache.length = 0;
+        this._cache = [];
     },
 
     getCachedValueOrUpdate: function(pIndex, pUpdateF, pUpdateContext) {

@@ -22,7 +22,8 @@ var Swipe = (function (_super) {
 
         this.data = {
             direction: null,
-            velocity: 0
+            velocity: 0,
+            target: null
         };
     }
 
@@ -34,6 +35,7 @@ var Swipe = (function (_super) {
             if(!this.isListening && pFingerList.length >= this.options.nbFingers) {
                 for(var i=0; i<this.options.nbFingers; i++) {
                     this._addListenedFinger(pFingerList[i]);
+                    this.data.target = pFinger.getTarget();
                 }
             }
         },

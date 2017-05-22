@@ -7,23 +7,23 @@
  * @return {Swipe}
  */
 
-
-
 var Tap = (function (_super) {
 
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
         nbTapMin: 0,
-        nbTapMax: Number.MAX_VALUE,
-        tapInterval: 400,
-        maxDistanceMoving: Number.MAX_VALUE
+        nbTapMax: 50,
+        tapInterval: 300,
+        maxDistanceMoving: 10
     };
 
     function Tap(pOptions) {
         _super.call(this, pOptions, DEFAULT_OPTIONS);
         this.data = {
             nbTap: 0,
-            lastTapTimestamp: 0
+            lastTapTimestamp: 0,
+            tapPosition: [0,0],
+            target: null
         };
     }
 
@@ -45,14 +45,20 @@ var Tap = (function (_super) {
         },
 
         _onFingerUpdate: function(pFinger) {
+            if(pFinger.currentP.timestamp - pFinger.startP.timestamp > this.options.tapInterval) {
+                this._removeAllListenedFingers();
+            }
         },
 
         _onFingerRemoved: function(pFinger) {
+
             this._removeAllListenedFingers();
 
             if(pFinger.getTotalTime() < this.options.tapInterval &&
                 pFinger.getDistance() < this.options.maxDistanceMoving) {
                 this.data.lastTapTimestamp = pFinger.getTime();
+                this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
+                this.data.target = pFinger.getTarget();
                 this.data.nbTap++;
 
                 if(this.data.nbTap >= this.options.nbTapMin && this.data.nbTap <= this.options.nbTapMax) {

@@ -10,9 +10,8 @@ var Hold = (function (_super) {
    
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        distanceThreshold: 0.5,             // in cm
-        duration: 600,                      // in ms
-        preventCombinedGestures: true
+        distanceThreshold: 1,  // in cm
+        duration: 600          // in ms
     };
 
     function Hold(pOptions) {
@@ -26,39 +25,35 @@ var Hold = (function (_super) {
     Fingers.__extend(Hold.prototype, _super.prototype, {
 
         timer: null,
+        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
         _onFingerAdded: function(pNewFinger, pFingerList) {
-            // this protects from combined gesture recognition when overreached the number of 
-            if(!this.isListening && 
-                this.options.preventCombinedGestures && 
-                pFingerList.length > this.options.nbFingers
-                ) {
-                    this._removeAllListenedFingers();
-            }
             if(!this.isListening && pFingerList.length >= this.options.nbFingers) {
                 for(var i=0; i<this.options.nbFingers; i++) {
                     this._addListenedFinger(pFingerList[i]);
                 }
-
                 clearTimeout(this.timer);
-                this.data.target = pNewFinger.getTarget();
                 this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
+                this.data.target = pNewFinger.getTarget();
+            }
+
+            if (this.listenedFingers.length+pFingerList.length-this.options.nbFingers > this.options.nbFingers) {
+                // console.log('too many fingers, removing hold: ' + pFingerList.length + ', ' + this.listenedFingers.length)
+                this._onHoldCancel();
             }
         },
 
         _onFingerUpdate: function(pFinger) {
 
-            // if the distanceThreshold is overreached in one or the other dimension, then cancel
-            if(pFinger.currentP.x - pFinger.startP.x > this.options.distanceThreshold*Utils.PPCM) {
-                this._onHoldCancel();
-            }
 
-            if(pFinger.currentP.y - pFinger.startP.y > this.options.disanceThreshold*Utils.PPCM) {
+            // cancel when the distance threshold is overreached in at least one of the dimensions
+            if(Math.abs(pFinger.currentP.x - pFinger.startP.x) > this._threshold || 
+               Math.abs(pFinger.currentP.y - pFinger.startP.y) > this._threshold) {
                 this._onHoldCancel();
             }
 
             for(var i = 0, size = this.listenedFingers.length; i<size; i++) {
-                if(this.listenedFingers[i].getDistance() > this.options.distanceThreshold*Utils.PPCM) {
+                if(this.listenedFingers[i].getDistance() > this._threshold) {
                     this._onHoldCancel();
                     break;
                 }
@@ -71,7 +66,6 @@ var Hold = (function (_super) {
 
         _onHoldTimeLeftF: null,
         _onHoldTimeLeft: function() {
-            // console.log('Hold', this);
             this.fire(_super.EVENT_TYPE.instant, this.data);
         },
 

@@ -9,7 +9,6 @@
  * @param {Number} pY
  * @return {Finger}
  */
-
 var Finger = function(pId, pTimestamp, pX, pY, target) {
     this.id = pId;
     this.state = Finger.STATE.ACTIVE;
@@ -65,7 +64,6 @@ Finger.prototype = {
     startP: null,
     previousP: null,
     currentP: null,
-    nbListeningInstances: 0,
     _cacheArray: null,
     _handlerList: null,
 
@@ -76,7 +74,7 @@ Finger.prototype = {
     _removeHandlerObject: function(pHandlerObject) {
         var index = this._handlerList.indexOf(pHandlerObject);
         this._handlerList.splice(index, 1);
-        console.log('removed handler: ', pHandlerObject);
+        // console.log('removed handler: ', pHandlerObject);
     },
 
     _clearHandlerObjects: function() {

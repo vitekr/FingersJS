@@ -4,13 +4,11 @@
  * @class Rotate
  * @constructor
  * @param {Object} pOptions
- * @param {Function} pHandler
  * @return {Rotate}
  */
-
-var Rotate = (function (_super) {
+ var Rotate = (function (_super) {
     var DEFAULT_OPTIONS = {
-        angleThreshold: 5
+        angleThreshold: 0.02
     };
 
     function Rotate(pOptions) {
@@ -45,20 +43,13 @@ var Rotate = (function (_super) {
         },
 
         _onFingerUpdate: function(pFinger) {
- 
             var newAngle = this._getFingersAngle();
             this.data.totalRotation = this._startAngle - newAngle;
             this.data.deltaRotation = this._lastAngle - newAngle;
-            this._lastAngle = newAngle;
-            // console.log(this.data.totalRotation, this.data.deltaRotation, newAngle)
-            
-            // if(Math.abs(this.data.deltaRotation) > this.options.angleThreshold) {
-            //    this.fire(_super.EVENT_TYPE.move, this.data);            
-            // }
-           if(Math.abs(this.data.totalRotation) > this.options.angleThreshold) {
-                this.fire(_super.EVENT_TYPE.move, this.data);  
+            this._lastAngle = newAngle;       
+            if(Math.abs(this.data.deltaRotation) > this.options.angleThreshold) {
+               this.fire(_super.EVENT_TYPE.move, this.data);            
             }
-
         },
 
         _onFingerRemoved: function(pFinger) {

@@ -50,7 +50,7 @@ var Utils = {
     },
 
     getAngle: function(x, y) {
-        return (Math.atan2(x, y)*180)/Math.PI;
+        return Math.atan2(x, y);
     },
 
     getDistance: function(x, y) {
@@ -65,4 +65,3 @@ var Utils = {
 };
 
 Fingers.Utils = Utils;
-

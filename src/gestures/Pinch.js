@@ -6,8 +6,6 @@
  * @param {Object} pOptions
  * @return {Pinch}
  */
-
-
 var Pinch = (function (_super) {
 
     var DEFAULT_OPTIONS = {

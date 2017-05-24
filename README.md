@@ -144,7 +144,7 @@ No data
         swipeVelocityY: 0.6
     };
 #### Data
-- direction
+- direction (up, down, left, right)
 - velocity
 - target
 
@@ -165,12 +165,14 @@ Pinch fires the event after the gesture is completed.
 
 #### Options
     {
-        angleThreshold: 5   // in degrees
+        angleThreshold: 0   // in radians
     }
 
 #### Data
 - totalRotation (rotation since the gesture start)
 - deltaRotation (rotation since the last gesture move)
+
+Note, that the angles are in radians.
 
 #### Internal variables
 - ```_startAngle```

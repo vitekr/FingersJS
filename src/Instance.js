@@ -141,25 +141,23 @@ Instance.prototype = {
     
     _onTouchEnd: function(pTouchEvent) {
         for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
-            this._removeFinger(pTouchEvent.changedTouches[i].identifier, pTouchEvent.timeStamp);
-            // console.log(pTouchEvent.changedTouches[i].identifier)
+            // console.log('here I should remove the finger: ' + pTouchEvent.changedTouches[i].identifier);
+            // this._removeFinger(pTouchEvent.changedTouches[i].identifier, pTouchEvent.timeStamp);
+            this._removeFinger(pTouchEvent.changedTouches[i].identifier);
         }
         //FIXME: BEWARE OF OGRES AND THIS NASTY HACK that :/
         // this is dirty nasty hack for cleaning the orphaned Finger objects
         // TODO: try to fix me
-        if (this.fingerList.length && Date.now()-this.fingerList[0].currentP.timestamp > Finger.CONSTANTS.inactivityTime) {
-            this._removeAllFingers();
-        }
+        // if (this.fingerList.length && Date.now()-this.fingerList[0].previousP.timestamp > Finger.CONSTANTS.inactivityTime) {
+        //     this._removeAllFingers();
+        // }
     },
 
     _onTouchCancel: function(pTouchEvent) {
-        //Security to prevent chrome bugs
-        var finger;
         for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
-            finger = Instance.FINGER_MAP[pTouchEvent.changedTouches[i].identifier];
+            var finger = Instance.FINGER_MAP[pTouchEvent.changedTouches[i].identifier];
             if(finger !== undefined && this._getFingerPosition(finger) !== -1) {
-                //Remove all fingers
-                this._removeAllFingers(pTouchEvent.timeStamp);
+                this._removeAllFingers();
                 break;
             }
         }
@@ -178,36 +176,29 @@ Instance.prototype = {
         }
 
         this.fingerList.push(finger);
-        finger.nbListeningInstances++;
 
         for(var i=0, size=this.gestureList.length; i<size; i++) {
             this.gestureList[i]._onFingerAdded(finger, this.fingerList);
         }
     },
 
-    _removeFinger: function(pFingerId, pTimestamp) {
+    _removeFinger: function(pFingerId) {
         var finger = Instance.FINGER_MAP[pFingerId];
-        // console.log('remove finger', pFingerId)
         if(finger !== undefined) {
             this.fingerList.splice(this._getFingerPosition(finger), 1);
+            finger._setEndP(Date.now()-10);
+            finger._clearHandlerObjects();
             delete this.fingerCreatedMap[finger.id];
-            finger.nbListeningInstances--;
-
-            //Only last one can remove a finger
-            if(finger.nbListeningInstances === 0) {
-                // FIXME: console.log('removing finger', finger.id)
-                finger._setEndP(pTimestamp);
-                delete Instance.FINGER_MAP[finger.id];
-
-                finger._clearHandlerObjects();
-            }
+            delete Instance.FINGER_MAP[finger.id];
+        } else {
+            console.log('!!!! AJAJAJ, finger undefined');
         }
     },
 
-    _removeAllFingers: function(pTimestamp) {
-        var list = this.fingerList.splice(0);
-        for(var i= 0, size=list.length; i<size; i++) {
-            this._removeFinger(list[i].id, pTimestamp);
+    _removeAllFingers: function() {
+        // var list = this.fingerList.splice(0);
+        for(var i=0, size=this.fingerList.length; i<size; i++) {
+            this._removeFinger(this.fingerList[i].id);
         }
     },
 

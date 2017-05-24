@@ -6,14 +6,11 @@
  * @param {Object} pOptions
  * @return {Drag}
  */
-
-
 var Drag = (function (_super) {
 
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        distanceThreshold: 0.2, // in cm
-        preventCombinedGestures: true
+        distanceThreshold: 0.3      // in cm
     };
 
     function Drag(pOptions) {
@@ -22,33 +19,34 @@ var Drag = (function (_super) {
 
 
     Fingers.__extend(Drag.prototype, _super.prototype, {
+        
+        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
         _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length == this.options.nbFingers) {
+            if(!this.isListening && 
+               pFingerList.length+this.listenedFingers.length <= this.options.nbFingers) {
                 for(var i=0; i<this.options.nbFingers; i++) {
-                    // console.log('Finger ' + pNewFinger.id + '[+ Drag]')
                     this._addListenedFinger(pFingerList[i]);
                     this.fire(_super.EVENT_TYPE.start, null);
                 }
-            }
-
-            // this protects from combined gesture recognition when overreached the number of 
-            // fingers, i.e., drag+zoom is not possible
-            if(this.options.preventCombinedGestures && pFingerList.length > this.options.nbFingers) {
-                // console.log('Finger ' + pNewFinger.id + '[- Drag]')
+            } else {
                 this._removeAllListenedFingers();
             }
         },
 
         _onFingerUpdate: function(pFinger) {
-            if(pFinger.getDeltaDistance() > this.options.distanceThreshold*Utils.PPCM) {
+            var threshold = this._threshold;
+            
+            if(pFinger.getDeltaDistance() > threshold) {
                 this.fire(_super.EVENT_TYPE.move, null);
             }
         },
 
         _onFingerRemoved: function(pFinger) {
-            // console.log('Finger ' + pFinger.id + '[- Drag]')
-            this.fire(_super.EVENT_TYPE.end, null);
+            var threshold = this._threshold;
+            if(pFinger.getDeltaDistance() > threshold) {
+                this.fire(_super.EVENT_TYPE.end, null);
+            }
             this._removeAllListenedFingers();
         }
     });
@@ -56,4 +54,4 @@ var Drag = (function (_super) {
     return Drag;
 })(Fingers.Gesture);
 
-Fingers.gesture.Drag = Drag;    
+Fingers.gesture.Drag = Drag;   

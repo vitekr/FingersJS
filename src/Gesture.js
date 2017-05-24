@@ -105,13 +105,10 @@ Gesture.prototype = {
             finger = this.listenedFingers[i];
             // FIXME HERE FIRST: 
             // console.log('removing finger', finger.id, finger.state, finger._handlerList)
-            console.log('before' + finger.id + ", " + finger.state, finger._handlerList);
+            // console.log('before' + finger.id + ", " + finger.state, finger._handlerList);
             finger._removeHandlerObject(this);
-            // if(finger._handlerList.length === 0) {
-            //     this._removeAllListenedFingers();
-            // }
-            // FIXME: 
-            console.log('after' + finger.id + ", " + finger.state, finger._handlerList);
+            this.isListening = false;
+            // console.log('after' + finger.id + ", " + finger.state, finger._handlerList);
         }
 
         this.listenedFingers = [];

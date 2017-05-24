@@ -6,8 +6,6 @@
  * @param {Object} pOptions
  * @return {Raw}
  */
-
-
 var Raw = (function (_super) {
 
     var DEFAULT_OPTIONS = {

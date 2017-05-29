@@ -191,12 +191,13 @@ Instance.prototype = {
             delete this.fingerCreatedMap[finger.id];
             delete Instance.FINGER_MAP[finger.id];
         } else {
-            console.log('!!!! AJAJAJ, finger undefined');
+            console.log('WHOOOPS, finger undefined! Cleaning the fingerList');
+            this.fingerList = [];
         }
     },
 
     _removeAllFingers: function() {
-        // var list = this.fingerList.splice(0);
+        var list = this.fingerList.splice(0);
         for(var i=0, size=this.fingerList.length; i<size; i++) {
             this._removeFinger(this.fingerList[i].id);
         }

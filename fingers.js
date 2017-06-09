@@ -882,6 +882,10 @@ var Transform = (function (_super) {
         data: null,
 
         _onFingerAdded: function(pNewFinger) {
+
+            if(this.listenedFingers.length == 2) {
+                this._removeAllListenedFingers();
+            }
         
             if(!this.isListening && this.listenedFingers.length >= 0) {
 

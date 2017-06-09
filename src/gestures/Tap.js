@@ -10,10 +10,11 @@ var Tap = (function (_super) {
 
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        nbTapMin: 2,
-        nbTapMax: 2,
-        tapInterval: 100,
-        distanceThreshold: 0.2  // in cm
+        nbTapMin: 1,
+        nbTapMax: 1,
+        tapInterval: 180,
+        tapDuration: 50,
+        distanceThreshold: 0.4  // in cm
     };
 
     function Tap(pOptions) {
@@ -29,59 +30,54 @@ var Tap = (function (_super) {
     Fingers.__extend(Tap.prototype, _super.prototype, {
 
         data: null,
-        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= this.options.nbFingers &&
-                this.listenedFingers.length+pFingerList.length <= this.options.nbFingers) {
+        _onFingerAdded: function(pNewFinger) {
+
+            if(this.isListening && this.listenedFingers.length == 1) {
+                pNewFinger._removeHandlerObject(this);
+                this.listenedFingers.length = 0;
+                this.isListening = false;
+            }
+            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) { 
 
                 if((pNewFinger.getTime() - this.data.lastTapTimestamp) > this.options.tapInterval) {
-                    this._clearTap();
+                    this.data.lastTapTimestamp = 0;
+                    this.data.nbTap = 0;
                 }
-
-                for(var i=0; i<this.options.nbFingers; i++) {
-                    this._addListenedFinger(pFingerList[i]);
-                }
-
-                if (this.listenedFingers.length+pFingerList.length-this.options.nbFingers > this.options.nbFingers) {
-                    // console.log('too many fingers, removing tap: ' + pFingerList.length + ', ' + this.listenedFingers.length)
-                    this._removeAllListenedFingers();
-                }
-            }
+                this._addListenedFinger(pNewFinger);
+            } 
         },
 
         _onFingerUpdate: function(pFinger) {
-         
-            if(pFinger.currentP.timestamp - pFinger.startP.timestamp > this.options.tapInterval) {
-                this._removeAllListenedFingers();
+
+            if (pFinger.getTotalTime() > this.options.tapInterval &&
+               pFinger.getDistance() > this.options.distanceThreshold*Utils.PPCM) {
+                pFinger._removeHandlerObject(this);
+                this.listenedFingers.length = 0;
+                this.isListening = false;
             }
         },
 
         _onFingerRemoved: function(pFinger) {
 
-             this._removeAllListenedFingers();
-
-            if (pFinger.getTotalTime() < this.options.tapInterval ||
+            pFinger._removeHandlerObject(this);
+            this.listenedFingers.length = 0;
+            this.isListening = false;
+                             
+            if (pFinger.getTotalTime() < this.options.tapInterval &&
                pFinger.getDistance() < this.options.distanceThreshold*Utils.PPCM) {
                 this.data.lastTapTimestamp = pFinger.getTime();
-                this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
-                this.data.target = pFinger.getTarget();
-                this.data.nbTap++;
                 
+                this.data.nbTap++;
                 if (this.data.nbTap >= this.options.nbTapMin &&  
-                   this.data.nbTap <= this.options.nbTapMax) {
+                    this.data.nbTap <= this.options.nbTapMax) {
+                    this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
+                    this.data.target = pFinger.getTarget();
                     this.fire(_super.EVENT_TYPE.instant, this.data);
-                } else {
-                    this._removeAllListenedFingers();
-                }
+
+                } 
             }
-        },
-
-        _clearTap: function() {
-            this.data.lastTapTimestamp = 0;
-            this.data.nbTap = 0;
         }
-
     });
 
     return Tap;

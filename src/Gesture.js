@@ -36,13 +36,12 @@ Gesture.prototype = {
     },
 
     removeHandler: function(pHandler) {
-        var index = this._handlerList.indexOf(pHandler);
-        this._handlerList.splice(index, 1);
+        this._removeHandlerObject(pHandler);
         return this;
     },
 
     removeAllHandlers: function() {
-        this._handlerList = [];
+        this._handlerList.length = 0;
         return this;
     },
 
@@ -62,7 +61,7 @@ Gesture.prototype = {
     },
 
     /*---- Fingers events ----*/
-    _onFingerAdded: function(pNewFinger, pFingerList) { /*To Override*/ },
+    _onFingerAdded: function(pNewFinger) { /*To Override*/ },
 
     _onFingerUpdate: function(pFinger) { /*To Override*/ },
 
@@ -70,28 +69,24 @@ Gesture.prototype = {
 
     /*---- Actions ----*/
     _addListenedFingers: function(pFinger1, pFinger2, pFinger3) {
-        for(var i= 0, size=arguments.length; i<size; i++) {
+        for(var i=0, size=arguments.length; i<size; i++) {
             this._addListenedFinger(arguments[i]);
         }
     },
+
     _addListenedFinger: function(pFinger) {
-        this.listenedFingers.push(pFinger);
-        pFinger._addHandlerObject(this);
+            this.listenedFingers.push(pFinger);
+            pFinger._addHandlerObject(this);
 
-        if(!this.isListening) {
-            this.isListening = true;
-        }
+            if(!this.isListening) {
+                this.isListening = true;
+            }
     },
 
-    _removeListenedFingers: function(pFinger1, pFinger2, pFinger3) {
-        for(var i= 0, size=arguments.length; i<size; i++) {
-            this._removeListenedFinger(arguments[i]);
-        }
-    },
     _removeListenedFinger: function(pFinger) {
-        pFinger._removeHandlerObject(this);
 
-        var index = this.listenedFingers.indexOf(pFinger);
+        pFinger._removeHandlerObject(this);
+        index = this.listenedFingers.indexOf(pFinger);
         this.listenedFingers.splice(index, 1);
 
         if(this.listenedFingers.length === 0) {
@@ -103,26 +98,15 @@ Gesture.prototype = {
         var finger;
         for(var i= 0, size=this.listenedFingers.length; i<size; i++) {
             finger = this.listenedFingers[i];
-            // FIXME HERE FIRST: 
-            // console.log('removing finger', finger.id, finger.state, finger._handlerList)
-            // console.log('before' + finger.id + ", " + finger.state, finger._handlerList);
-            finger._removeHandlerObject(this);
-            this.isListening = false;
-            // console.log('after' + finger.id + ", " + finger.state, finger._handlerList);
+            // console.log('before ' + finger.id + ", " + finger.state, finger._handlerList);
+            this.listenedFingers[i]._removeHandlerObject(this);
+            // console.log('after ' + finger.id + ", " + finger.state, finger._handlerList);
         }
-
-        this.listenedFingers = [];
+        this.listenedFingers.length = 0;
         this.isListening = false;
     },
-
-    /*---- Utils ----*/
-    isListenedFinger: function(pFinger) {
-        return (this.isListening && this.getListenedPosition(pFinger) > -1);
-    },
-
-    getListenedPosition: function(pFinger) {
-        return this.listenedFingers.indexOf(pFinger);
-    }
 };
 
 Fingers.Gesture = Gesture;
+
+Fingers.gesture = {};

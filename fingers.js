@@ -1,4 +1,4 @@
-/*! FingersJS - v1.0.0 - 2017-05-24
+/*! FingersJS - v1.0.0 - 2017-06-09
  * https://github.com/vitekr/fingers.js
  *
  * Copyright (c) 2017 Vít Rusňák <vit.rusnak@gmail.com>;
@@ -92,53 +92,6 @@ Fingers.Utils = Utils;
 
 /**
  * @module fingers
- *
- * @class CacheArray
- * @constructor
- * @return {CacheArray}
- */
-
-var CacheArray = function() {
-    this._cache = [];
-};
-
-CacheArray.prototype = {
-    _cache: null,
-
-    isCachedValue: function(pIndex) {
-        return (this._cache[pIndex] !== undefined);
-    },
-
-    getCachedValue: function(pIndex) {
-        return this._cache[pIndex];
-    },
-
-    setCachedValue: function(pIndex, pValue) {
-        this._cache[pIndex] = pValue;
-    },
-
-    clearCachedValue: function(pIndex) {
-        delete this._cache[pIndex];
-    },
-
-    clearCache: function() {
-        this._cache = [];
-    },
-
-    getCachedValueOrUpdate: function(pIndex, pUpdateF, pUpdateContext) {
-        var cacheValue = this.getCachedValue(pIndex);
-        if(cacheValue === undefined) {
-            cacheValue = pUpdateF.call(pUpdateContext);
-            this.setCachedValue(pIndex, cacheValue);
-        }
-        return cacheValue;
-    }
-};
-
-Fingers.CacheArray = CacheArray;
-
-/**
- * @module fingers
  */
 
 /**
@@ -169,18 +122,6 @@ Instance.prototype = {
     element: null,
 
     /**
-     * @property fingerList
-     * @type {Array.<Finger>}
-     */
-    fingerList: null,
-
-    /**
-     * @property fingerCreatedMap
-     * @type {Object.<Number>, Finger>}
-     */
-    fingerCreatedMap: null,
-
-    /**
      * @property gestureList
      * @type {Array.<Gesture>}
      */
@@ -189,8 +130,6 @@ Instance.prototype = {
     /*---- INIT ----*/
     _init: function(pElement) {
         this.element = pElement;
-        this.fingerList = [];
-        this.fingerCreatedMap = {};
         this.gestureList = [];
         this.startListening();
     },
@@ -221,7 +160,7 @@ Instance.prototype = {
         for(var i = 0, size=this.gestureList.length; i<size; i++) {
             this.gestureList[i].removeAllHandlers();
         }
-        this.gestureList = [];
+        this.gestureList.length = 0;
     },
 
     /*---- Native event listening ----*/
@@ -251,7 +190,6 @@ Instance.prototype = {
     _stopListeningF: null,
     stopListening: function() {
         if(this._stopListeningF !== null) {
-            this._removeAllFingers(Date.now());
             this._stopListeningF();
             this._stopListeningF = null;
         }
@@ -259,10 +197,21 @@ Instance.prototype = {
 
     /*-------- Touch events ----*/
     _onTouchStart: function(pTouchEvent) {
-        var touch;
-        for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
-            touch = pTouchEvent.changedTouches[i];
-            this._createFinger(touch.identifier, pTouchEvent.timeStamp, touch.pageX, touch.pageY, this.getElement().id);
+        for(var i=0, size=pTouchEvent.changedTouches.length; i<size; i++) {
+            var touch = pTouchEvent.changedTouches[i];
+            var finger = null;
+            var pFingerId = touch.identifier;
+
+            if(Instance.FINGER_MAP[pFingerId] === undefined) {
+                finger = new Finger(pFingerId, Date.now(), touch.pageX, touch.pageY, this.getElement().id);
+                Instance.FINGER_MAP[pFingerId] = finger;
+            }  else {
+                finger = Instance.FINGER_MAP[pFingerId];
+            }
+
+            for(var j=0, size2=this.gestureList.length; j<size2; j++) {
+                this.gestureList[j]._onFingerAdded(finger);
+            }
         }
         pTouchEvent.preventDefault();
     },
@@ -271,94 +220,40 @@ Instance.prototype = {
         var touch;
         for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
             touch = pTouchEvent.changedTouches[i];
-            this._updateFingerPosition(touch.identifier, pTouchEvent.timeStamp, touch.pageX, touch.pageY);
+            var finger = Instance.FINGER_MAP[touch.identifier];
+            if(finger !== undefined) {
+                finger._setCurrentP(Date.now(), touch.pageX, touch.pageY, false);
+            }
         }
-
         pTouchEvent.preventDefault();
     },
 
-    
     _onTouchEnd: function(pTouchEvent) {
-        for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
-            // console.log('here I should remove the finger: ' + pTouchEvent.changedTouches[i].identifier);
-            // this._removeFinger(pTouchEvent.changedTouches[i].identifier, pTouchEvent.timeStamp);
-            this._removeFinger(pTouchEvent.changedTouches[i].identifier);
+        var finger = Instance.FINGER_MAP[pTouchEvent.changedTouches[0].identifier];
+        if(finger !== undefined) {
+            finger._setEndP(Date.now());
+            finger._clearHandlerObjects();
+            delete Instance.FINGER_MAP[finger.id];
         }
-        //FIXME: BEWARE OF OGRES AND THIS NASTY HACK that :/
-        // this is dirty nasty hack for cleaning the orphaned Finger objects
-        // TODO: try to fix me
-        // if (this.fingerList.length && Date.now()-this.fingerList[0].previousP.timestamp > Finger.CONSTANTS.inactivityTime) {
-        //     this._removeAllFingers();
-        // }
+        pTouchEvent.preventDefault();
     },
 
     _onTouchCancel: function(pTouchEvent) {
-        for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
+        for(var i=0, size=pTouchEvent.changedTouches.length; i<size; i++) {
             var finger = Instance.FINGER_MAP[pTouchEvent.changedTouches[i].identifier];
-            if(finger !== undefined && this._getFingerPosition(finger) !== -1) {
-                this._removeAllFingers();
+            if(finger !== undefined && this.fingerList.indexOf(finger) !== -1) {
+                finger._setEndP(Date.now());
+                finger._clearHandlerObjects();
+                delete Instance.FINGER_MAP[finger.id];
                 break;
             }
         }
-    },
-
-    /*---- Fingers ----*/
-    _createFinger: function(pFingerId, pTimestamp, pX, pY, target) {
-        var finger;
-        if(Instance.FINGER_MAP[pFingerId] === undefined) {
-            finger = new Finger(pFingerId, pTimestamp, pX, pY, target);
-            Instance.FINGER_MAP[pFingerId] = finger;
-            this.fingerCreatedMap[pFingerId] = finger;
-        }
-        else {
-            finger = Instance.FINGER_MAP[pFingerId];
-        }
-
-        this.fingerList.push(finger);
-
-        for(var i=0, size=this.gestureList.length; i<size; i++) {
-            this.gestureList[i]._onFingerAdded(finger, this.fingerList);
-        }
-    },
-
-    _removeFinger: function(pFingerId) {
-        var finger = Instance.FINGER_MAP[pFingerId];
-        if(finger !== undefined) {
-            this.fingerList.splice(this._getFingerPosition(finger), 1);
-            finger._setEndP(Date.now()-10);
-            finger._clearHandlerObjects();
-            delete this.fingerCreatedMap[finger.id];
-            delete Instance.FINGER_MAP[finger.id];
-        } else {
-            console.log('!!!! AJAJAJ, finger undefined');
-        }
-    },
-
-    _removeAllFingers: function() {
-        // var list = this.fingerList.splice(0);
-        for(var i=0, size=this.fingerList.length; i<size; i++) {
-            this._removeFinger(this.fingerList[i].id);
-        }
-    },
-
-    _updateFingerPosition: function(pFingerId, pTimestamp, pX, pY) {
-        //Only creator can update a finger
-        var finger = this.fingerCreatedMap[pFingerId];
-        if(finger !== undefined) {
-            finger._setCurrentP(pTimestamp, pX, pY, false);
-        }
-    },
-
-    /*---- utils ----*/
-    _getFingerPosition: function(pFinger) {
-        var index = this.fingerList.indexOf(pFinger);
-        // console.log(index, pFinger.id)
-        return index;
+        pTouchEvent.preventDefault();
     }
-
 };
 
 Fingers.Instance = Instance;
+
 
 /**
  * @module fingers
@@ -369,6 +264,7 @@ Fingers.Instance = Instance;
  * @param {Number} pTimestamp
  * @param {Number} pX
  * @param {Number} pY
+ * @param {String} target
  * @return {Finger}
  */
 var Finger = function(pId, pTimestamp, pX, pY, target) {
@@ -380,32 +276,8 @@ var Finger = function(pId, pTimestamp, pX, pY, target) {
     this.startP = new Position(pTimestamp, pX, pY);
     this.previousP = new Position(pTimestamp, pX, pY);
     this.currentP = new Position(pTimestamp, pX, pY);
-
-    this._cacheArray = new CacheArray();
 };
 
-var CACHE_INDEX_CREATOR = 0;
-Finger.cacheIndexes = {
-    deltaTime: CACHE_INDEX_CREATOR++,
-    totalTime: CACHE_INDEX_CREATOR++,
-
-    deltaX: CACHE_INDEX_CREATOR++,
-    deltaY: CACHE_INDEX_CREATOR++,
-    deltaDistance: CACHE_INDEX_CREATOR++,
-    totalX: CACHE_INDEX_CREATOR++,
-    totalY: CACHE_INDEX_CREATOR++,
-    totalDistance: CACHE_INDEX_CREATOR++,
-
-    deltaDirection: CACHE_INDEX_CREATOR++,
-    totalDirection: CACHE_INDEX_CREATOR++,
-
-    velocityX: CACHE_INDEX_CREATOR++,
-    velocityY: CACHE_INDEX_CREATOR++,
-    velocity: CACHE_INDEX_CREATOR++,
-    velocityAverage: CACHE_INDEX_CREATOR++,
-    orientedVelocityX: CACHE_INDEX_CREATOR++,
-    orientedVelocityY: CACHE_INDEX_CREATOR++
-};
 
 Finger.STATE = {
     ACTIVE: "active",
@@ -413,7 +285,7 @@ Finger.STATE = {
 };
 
 Finger.CONSTANTS = {
-    inactivityTime: 200
+    inactivityTime: 100
 };
 
 Finger.prototype = {
@@ -426,26 +298,23 @@ Finger.prototype = {
     startP: null,
     previousP: null,
     currentP: null,
-    _cacheArray: null,
     _handlerList: null,
 
     _addHandlerObject: function(pHandlerObject) {
         this._handlerList.push(pHandlerObject);
     },
 
+    _clearHandlerObjects: function() {
+        this._handlerList.length = 0;
+    },
+
     _removeHandlerObject: function(pHandlerObject) {
         var index = this._handlerList.indexOf(pHandlerObject);
         this._handlerList.splice(index, 1);
-        // console.log('removed handler: ', pHandlerObject);
-    },
-
-    _clearHandlerObjects: function() {
-        this._handlerList = [];
     },
 
     _setCurrentP: function(pTimestamp, pX, pY, pForceSetter) {
         if(this.getX() != pX || this.getY() != pY || pForceSetter) { //Prevent chrome multiple events for same position (radiusX, radiusY)
-            this._cacheArray.clearCache();
 
             this.previousP.copy(this.currentP);
             this.currentP.set(pTimestamp, pX, pY);
@@ -457,13 +326,15 @@ Finger.prototype = {
     },
 
     _setEndP: function(pTimestamp) {
-        this.state = Finger.STATE.REMOVED;
         //Only update if end event is not "instant" with move event
         if((pTimestamp - this.getTime()) > Finger.CONSTANTS.inactivityTime) {
-            this._setCurrentP(pTimestamp, this.getX(), this.getY(), false);
+            this._setCurrentP(pTimestamp, this.getX(), this.getY(), true);
         }
-        var handlerList = this._handlerList.slice();
-        for(var i= 0; i<handlerList.length; i++) {
+        
+        this.state = Finger.STATE.REMOVED;
+
+        var handlerList = this._handlerList.slice(0);
+        for(var i=0; i<handlerList.length; i++) {
             handlerList[i]._onFingerRemoved(this);
         }
     },
@@ -474,22 +345,15 @@ Finger.prototype = {
     },
 
     getDeltaTime: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.deltaTime, this._getDeltaTime, this);
-    },
-    _getDeltaTime: function() {
         return this.currentP.timestamp - this.previousP.timestamp;
     },
 
     getTotalTime: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.totalTime, this._getTotalTime, this);
-    },
-    _getTotalTime: function() {
         return this.currentP.timestamp - this.startP.timestamp;
     },
 
     getInactivityTime: function() {
-        var delta = Date.now() - this.currentP.timestamp;
-        return (delta > Finger.CONSTANTS.inactivityTime) ? delta : 0;
+        return Date.now() - this.currentP.timestamp;
     },
 
     /*---- position ----*/
@@ -507,102 +371,60 @@ Finger.prototype = {
 
     /*---- distance ----*/
     getDeltaX: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.deltaX, this._getDeltaX, this);
-    },
-    _getDeltaX: function() {
         return this.currentP.x - this.previousP.x;
     },
 
     getDeltaY: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.deltaY, this._getDeltaY, this);
-    },
-    _getDeltaY: function() {
         return this.currentP.y - this.previousP.y;
     },
 
     getDeltaDistance: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.deltaDistance, this._getDeltaDistance, this);
-    },
-    _getDeltaDistance: function() {
         return Utils.getDistance(this.getDeltaX(), this.getDeltaY());
     },
 
     getTotalX: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.totalX, this._getTotalX, this);
-    },
-    _getTotalX: function() {
         return this.currentP.x - this.startP.x;
     },
 
     getTotalY: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.totalY, this._getTotalY, this);
-    },
-    _getTotalY: function() {
         return this.currentP.y - this.startP.y;
     },
 
     getDistance: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.totalDistance, this._getDistance, this);
-    },
-    _getDistance: function() {
         return Utils.getDistance(this.getTotalX(), this.getTotalY());
     },
 
     /*---- direction ----*/
     getDeltaDirection: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.deltaDirection, this._getDeltaDirection, this);
-    },
-    _getDeltaDirection: function() {
         return Utils.getDirection(this.getDeltaX(), this.getDeltaY());
     },
 
     getDirection: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.totalDirection, this._getDirection, this);
-    },
-    _getDirection: function() {
         return Utils.getDirection(this.getTotalX(), this.getTotalY());
     },
 
     /*---- velocity ----*/
     getVelocityX: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.velocityX, this._getVelocityX, this);
-    },
-    _getVelocityX: function() {
         return Utils.getVelocity(this.getDeltaTime(), this.getDeltaX());
     },
 
     getVelocityY: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.velocityY, this._getVelocityY, this);
-    },
-    _getVelocityY: function() {
         return Utils.getVelocity(this.getDeltaTime(), this.getDeltaY());
     },
 
     getVelocity: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.velocity, this._getVelocity, this);
-    },
-    _getVelocity: function() {
         return Utils.getVelocity(this.getDeltaTime(), this.getDeltaDistance());
     },
 
     getVelocityAverage: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.velocityAverage, this._getVelocity, this);
-    },
-    _getVelocityAverage: function() {
         return Utils.getVelocity(this.getTotalTime(), this.getDistance());
     },
 
     getOrientedVelocityX: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.orientedVelocityX, this._getOrientedVelocityX, this);
-    },
-    _getOrientedVelocityX: function() {
         return Utils.getOrientedVelocity(this.getDeltaTime(), this.getDeltaX());
     },
 
     getOrientedVelocityY: function() {
-        return this._cacheArray.getCachedValueOrUpdate(Finger.cacheIndexes.orientedVelocityY, this._getOrientedVelocityY, this);
-    },
-    _getOrientedVelocityY: function() {
         return Utils.getOrientedVelocity(this.getDeltaTime(), this.getDeltaY());
     }
 };
@@ -727,13 +549,12 @@ Gesture.prototype = {
     },
 
     removeHandler: function(pHandler) {
-        var index = this._handlerList.indexOf(pHandler);
-        this._handlerList.splice(index, 1);
+        this._removeHandlerObject(pHandler);
         return this;
     },
 
     removeAllHandlers: function() {
-        this._handlerList = [];
+        this._handlerList.length = 0;
         return this;
     },
 
@@ -753,7 +574,7 @@ Gesture.prototype = {
     },
 
     /*---- Fingers events ----*/
-    _onFingerAdded: function(pNewFinger, pFingerList) { /*To Override*/ },
+    _onFingerAdded: function(pNewFinger) { /*To Override*/ },
 
     _onFingerUpdate: function(pFinger) { /*To Override*/ },
 
@@ -761,28 +582,24 @@ Gesture.prototype = {
 
     /*---- Actions ----*/
     _addListenedFingers: function(pFinger1, pFinger2, pFinger3) {
-        for(var i= 0, size=arguments.length; i<size; i++) {
+        for(var i=0, size=arguments.length; i<size; i++) {
             this._addListenedFinger(arguments[i]);
         }
     },
+
     _addListenedFinger: function(pFinger) {
-        this.listenedFingers.push(pFinger);
-        pFinger._addHandlerObject(this);
+            this.listenedFingers.push(pFinger);
+            pFinger._addHandlerObject(this);
 
-        if(!this.isListening) {
-            this.isListening = true;
-        }
+            if(!this.isListening) {
+                this.isListening = true;
+            }
     },
 
-    _removeListenedFingers: function(pFinger1, pFinger2, pFinger3) {
-        for(var i= 0, size=arguments.length; i<size; i++) {
-            this._removeListenedFinger(arguments[i]);
-        }
-    },
     _removeListenedFinger: function(pFinger) {
-        pFinger._removeHandlerObject(this);
 
-        var index = this.listenedFingers.indexOf(pFinger);
+        pFinger._removeHandlerObject(this);
+        index = this.listenedFingers.indexOf(pFinger);
         this.listenedFingers.splice(index, 1);
 
         if(this.listenedFingers.length === 0) {
@@ -794,29 +611,19 @@ Gesture.prototype = {
         var finger;
         for(var i= 0, size=this.listenedFingers.length; i<size; i++) {
             finger = this.listenedFingers[i];
-            // FIXME HERE FIRST: 
-            // console.log('removing finger', finger.id, finger.state, finger._handlerList)
-            // console.log('before' + finger.id + ", " + finger.state, finger._handlerList);
-            finger._removeHandlerObject(this);
-            this.isListening = false;
-            // console.log('after' + finger.id + ", " + finger.state, finger._handlerList);
+            // console.log('before ' + finger.id + ", " + finger.state, finger._handlerList);
+            this.listenedFingers[i]._removeHandlerObject(this);
+            // console.log('after ' + finger.id + ", " + finger.state, finger._handlerList);
         }
-
-        this.listenedFingers = [];
+        this.listenedFingers.length = 0;
         this.isListening = false;
     },
-
-    /*---- Utils ----*/
-    isListenedFinger: function(pFinger) {
-        return (this.isListening && this.getListenedPosition(pFinger) > -1);
-    },
-
-    getListenedPosition: function(pFinger) {
-        return this.listenedFingers.indexOf(pFinger);
-    }
 };
 
 Fingers.Gesture = Gesture;
+
+Fingers.gesture = {};
+
 
 
 Fingers.gesture = {
@@ -834,32 +641,31 @@ var Drag = (function (_super) {
 
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        distanceThreshold: 0.3      // in cm
+        distanceThreshold: 0.3,      // in cm
     };
 
     function Drag(pOptions) {
         _super.call(this, pOptions, DEFAULT_OPTIONS);
     }
 
-
     Fingers.__extend(Drag.prototype, _super.prototype, {
-        
-        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && 
-               pFingerList.length+this.listenedFingers.length <= this.options.nbFingers) {
-                for(var i=0; i<this.options.nbFingers; i++) {
-                    this._addListenedFinger(pFingerList[i]);
-                    this.fire(_super.EVENT_TYPE.start, null);
-                }
-            } else {
-                this._removeAllListenedFingers();
+        _onFingerAdded: function(pNewFinger) {
+
+            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
+                this._addListenedFinger(pNewFinger);
+                this.fire(_super.EVENT_TYPE.start, null);
+            } 
+            
+            if(this.isListening && pNewFinger !== this.listenedFingers[0]) {
+               this.listenedFingers[0]._removeHandlerObject(this);
+                this.listenedFingers.length = 0;
+                this.isListening = false;
             }
         },
 
         _onFingerUpdate: function(pFinger) {
-            var threshold = this._threshold;
+            var threshold = this.options.distanceThreshold*Utils.PPCM;
             
             if(pFinger.getDeltaDistance() > threshold) {
                 this.fire(_super.EVENT_TYPE.move, null);
@@ -867,11 +673,10 @@ var Drag = (function (_super) {
         },
 
         _onFingerRemoved: function(pFinger) {
-            var threshold = this._threshold;
-            if(pFinger.getDeltaDistance() > threshold) {
-                this.fire(_super.EVENT_TYPE.end, null);
-            }
-            this._removeAllListenedFingers();
+            this.fire(_super.EVENT_TYPE.end, null);
+            pFinger._removeHandlerObject(this);
+            this.listenedFingers.length = 0;
+            this.isListening = false;
         }
     });
 
@@ -892,7 +697,7 @@ var Hold = (function (_super) {
    
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        distanceThreshold: 1,  // in cm
+        distanceThreshold: 0.8,  // in cm
         duration: 600          // in ms
     };
 
@@ -907,52 +712,39 @@ var Hold = (function (_super) {
     Fingers.__extend(Hold.prototype, _super.prototype, {
 
         timer: null,
-        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= this.options.nbFingers) {
-                for(var i=0; i<this.options.nbFingers; i++) {
-                    this._addListenedFinger(pFingerList[i]);
-                }
+        _onFingerAdded: function(pNewFinger) {
+            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
+                this._addListenedFinger(pNewFinger);
                 clearTimeout(this.timer);
                 this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
                 this.data.target = pNewFinger.getTarget();
-            }
-
-            if (this.listenedFingers.length+pFingerList.length-this.options.nbFingers > this.options.nbFingers) {
-                // console.log('too many fingers, removing hold: ' + pFingerList.length + ', ' + this.listenedFingers.length)
-                this._onHoldCancel();
-            }
+            } 
         },
 
         _onFingerUpdate: function(pFinger) {
-
-
-            // cancel when the distance threshold is overreached in at least one of the dimensions
-            if(Math.abs(pFinger.currentP.x - pFinger.startP.x) > this._threshold || 
-               Math.abs(pFinger.currentP.y - pFinger.startP.y) > this._threshold) {
+            var threshold = this.options.distanceThreshold*Utils.PPCM;
+            if(this.listenedFingers.length > 0 && this.listenedFingers[0].getDistance() > threshold) {
                 this._onHoldCancel();
-            }
-
-            for(var i = 0, size = this.listenedFingers.length; i<size; i++) {
-                if(this.listenedFingers[i].getDistance() > this._threshold) {
-                    this._onHoldCancel();
-                    break;
-                }
+                pFinger._removeHandlerObject(this);
             }
         },
 
         _onFingerRemoved: function(pFinger) {
+            pFinger._removeHandlerObject(this);
             this._onHoldCancel();
         },
 
         _onHoldTimeLeftF: null,
         _onHoldTimeLeft: function() {
             this.fire(_super.EVENT_TYPE.instant, this.data);
+            this._onHoldCancel();
         },
 
         _onHoldCancel: function() {
-            this._removeAllListenedFingers();
+            // console.log('hold canceled');
+            this.listenedFingers.length = 0;
+            this.isListening = false;
             clearTimeout(this.timer);
         }
     });
@@ -961,192 +753,6 @@ var Hold = (function (_super) {
 })(Fingers.Gesture);
 
 Fingers.gesture.Hold = Hold;
-
-/**
- * @module gestures
- *
- * @class Pinch
- * @constructor
- * @param {Object} pOptions
- * @return {Pinch}
- */
-var Pinch = (function (_super) {
-
-    var DEFAULT_OPTIONS = {
-        pinchInDetect: 0.6,
-        pinchOutDetect: 1.4
-    };
-
-    function Pinch(pOptions) {
-        _super.call(this, pOptions, DEFAULT_OPTIONS);
-
-        this.data = {
-            grow: null,
-            scale: 1,
-            target: null
-        };
-    }
-
-    Fingers.__extend(Pinch.prototype, _super.prototype, {
-
-        _startDistance: 0,
-        data: null,
-
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= 2) {
-                this._addListenedFingers(pFingerList[0], pFingerList[1]);
-
-                this._startDistance = this._getFingersDistance();
-                this.data.target = pFinger.getTarget();
-            }
-        },
-
-        _onFingerUpdate: function(pFinger) {},
-
-        _onFingerRemoved: function(pFinger) {
-            var newDistance = this._getFingersDistance();
-            var scale = newDistance / this._startDistance;
-
-            if(scale <= this.options.pinchInDetect || scale >= this.options.pinchOutDetect) {
-                this.data.grow = (scale > 1) ? Utils.GROW.OUT : Utils.GROW.IN;
-                this.data.scale = scale;
-                this.fire(_super.EVENT_TYPE.instant, this.data);
-            }
-
-            this._removeAllListenedFingers();
-        },
-
-        _getFingersDistance: function() {
-            var finger1P = this.listenedFingers[0].currentP;
-            var finger2P = this.listenedFingers[1].currentP;
-            return Fingers.Utils.getDistance(finger2P.x - finger1P.x, finger2P.y - finger1P.y);
-        }
-    });
-
-    return Pinch;
-})(Fingers.Gesture);
-
-Fingers.gesture.Pinch = Pinch;
-
-/**
- * @module gestures
- *
- * @class Raw
- * @constructor
- * @param {Object} pOptions
- * @return {Raw}
- */
-var Raw = (function (_super) {
-
-    var DEFAULT_OPTIONS = {
-        nbMaxFingers: 50
-    };
-
-    function Raw(pOptions) {
-        _super.call(this, pOptions, DEFAULT_OPTIONS);
-    }
-
-
-    Fingers.__extend(Raw.prototype, _super.prototype, {
-
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(this.listenedFingers.length < this.options.nbMaxFingers) {
-                this._addListenedFinger(pNewFinger);
-
-                this.fire(_super.EVENT_TYPE.start, pNewFinger);
-            }
-        },
-
-        _onFingerUpdate: function(pFinger) {
-            this.fire(_super.EVENT_TYPE.move, pFinger);
-        },
-
-        _onFingerRemoved: function(pFinger) {
-            this.fire(_super.EVENT_TYPE.end, pFinger);
-
-            this._removeListenedFinger(pFinger);
-        }
-    });
-
-    return Raw;
-})(Fingers.Gesture);
-
-Fingers.gesture.Raw = Raw;
-
-/**
- * @module gestures
- *
- * @class Swipe
- * @constructor
- * @param {Object} pOptions
- * @return {Swipe}
- */
-var Swipe = (function (_super) {
-
-    var DEFAULT_OPTIONS = {
-        nbFingers: 1,
-        swipeVelocityX: 0.6,
-        swipeVelocityY: 0.6
-    };
-
-    function Swipe(pOptions) {
-        _super.call(this, pOptions, DEFAULT_OPTIONS);
-
-        this.data = {
-            direction: null,
-            velocity: 0,
-            target: null
-        };
-    }
-
-    Fingers.__extend(Swipe.prototype, _super.prototype, {
-
-        data: null,
-
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= this.options.nbFingers) {
-                for(var i=0; i<this.options.nbFingers; i++) {
-                    this._addListenedFinger(pFingerList[i]);
-                    this.data.target = pNewFinger.getTarget();
-                }
-            }
-        },
-
-        _onFingerUpdate: function(pFinger) {
-        },
-
-        _onFingerRemoved: function(pFinger) {
-            var isSameDirection = true;
-            var size = this.listenedFingers.length;
-
-            if (size > 0) {
-                var direction = this.listenedFingers[0].getDeltaDirection();
-                var maxVelocityX = 0;
-                var maxVelocityY = 0;
-                
-                for(var i= 0; i<size; i++) {
-                    isSameDirection = isSameDirection && (direction === this.listenedFingers[i].getDeltaDirection());
-
-                    maxVelocityX = Math.max(maxVelocityX, this.listenedFingers[i].getVelocityX());
-                    maxVelocityY = Math.max(maxVelocityY, this.listenedFingers[i].getVelocityY());
-                }
-
-                if(isSameDirection &&
-                    (maxVelocityX > this.options.swipeVelocityX || maxVelocityY > this.options.swipeVelocityY)) {
-                    this.data.direction = direction;
-                    this.data.velocity = (maxVelocityX > this.options.swipeVelocityX) ? maxVelocityX : maxVelocityY;
-
-                    this.fire(_super.EVENT_TYPE.instant, this.data);
-                }
-            }
-            this._removeAllListenedFingers();
-        }
-    });
-
-    return Swipe;
-})(Fingers.Gesture);
-
-Fingers.gesture.Swipe = Swipe;
 
 /**
  * @module gestures
@@ -1160,10 +766,11 @@ var Tap = (function (_super) {
 
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        nbTapMin: 2,
-        nbTapMax: 2,
-        tapInterval: 100,
-        distanceThreshold: 0.2  // in cm
+        nbTapMin: 1,
+        nbTapMax: 1,
+        tapInterval: 180,
+        tapDuration: 50,
+        distanceThreshold: 0.4  // in cm
     };
 
     function Tap(pOptions) {
@@ -1179,59 +786,54 @@ var Tap = (function (_super) {
     Fingers.__extend(Tap.prototype, _super.prototype, {
 
         data: null,
-        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= this.options.nbFingers &&
-                this.listenedFingers.length+pFingerList.length <= this.options.nbFingers) {
+        _onFingerAdded: function(pNewFinger) {
+
+            if(this.isListening && this.listenedFingers.length == 1) {
+                pNewFinger._removeHandlerObject(this);
+                this.listenedFingers.length = 0;
+                this.isListening = false;
+            }
+            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) { 
 
                 if((pNewFinger.getTime() - this.data.lastTapTimestamp) > this.options.tapInterval) {
-                    this._clearTap();
+                    this.data.lastTapTimestamp = 0;
+                    this.data.nbTap = 0;
                 }
-
-                for(var i=0; i<this.options.nbFingers; i++) {
-                    this._addListenedFinger(pFingerList[i]);
-                }
-
-                if (this.listenedFingers.length+pFingerList.length-this.options.nbFingers > this.options.nbFingers) {
-                    // console.log('too many fingers, removing tap: ' + pFingerList.length + ', ' + this.listenedFingers.length)
-                    this._removeAllListenedFingers();
-                }
-            }
+                this._addListenedFinger(pNewFinger);
+            } 
         },
 
         _onFingerUpdate: function(pFinger) {
-         
-            if(pFinger.currentP.timestamp - pFinger.startP.timestamp > this.options.tapInterval) {
-                this._removeAllListenedFingers();
+
+            if (pFinger.getTotalTime() > this.options.tapInterval &&
+               pFinger.getDistance() > this.options.distanceThreshold*Utils.PPCM) {
+                pFinger._removeHandlerObject(this);
+                this.listenedFingers.length = 0;
+                this.isListening = false;
             }
         },
 
         _onFingerRemoved: function(pFinger) {
 
-             this._removeAllListenedFingers();
-
-            if (pFinger.getTotalTime() < this.options.tapInterval ||
+            pFinger._removeHandlerObject(this);
+            this.listenedFingers.length = 0;
+            this.isListening = false;
+                             
+            if (pFinger.getTotalTime() < this.options.tapInterval &&
                pFinger.getDistance() < this.options.distanceThreshold*Utils.PPCM) {
                 this.data.lastTapTimestamp = pFinger.getTime();
-                this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
-                this.data.target = pFinger.getTarget();
-                this.data.nbTap++;
                 
+                this.data.nbTap++;
                 if (this.data.nbTap >= this.options.nbTapMin &&  
-                   this.data.nbTap <= this.options.nbTapMax) {
+                    this.data.nbTap <= this.options.nbTapMax) {
+                    this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
+                    this.data.target = pFinger.getTarget();
                     this.fire(_super.EVENT_TYPE.instant, this.data);
-                } else {
-                    this._removeAllListenedFingers();
-                }
+
+                } 
             }
-        },
-
-        _clearTap: function() {
-            this.data.lastTapTimestamp = 0;
-            this.data.nbTap = 0;
         }
-
     });
 
     return Tap;
@@ -1279,57 +881,84 @@ var Transform = (function (_super) {
         _threshold: 1,
         data: null,
 
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            this._threshold = this.options.distanceThreshold*Utils.PPCM;
-            this.data.scale = true;
-            this.data.rotate = true;
-            if(!this.isListening && pFingerList.length == 2 && this.listenedFingers.length + pFingerList.length === 2) {
-                this._addListenedFingers(pFingerList[0], pFingerList[1]);
+        _onFingerAdded: function(pNewFinger) {
+        
+            if(!this.isListening && this.listenedFingers.length >= 0) {
 
-                this._lastAngle = this._getFingersAngle();
-                this._startAngle = this._lastAngle;
+                switch(this.listenedFingers.length) {
+                    case 0:
+                        this._addListenedFinger(pNewFinger);
+                        this.isListening = false;
+                        this.options.scale = true;
+                        this.options.rotate = true;
+                        break;
+                    case 1:
+                        if(this.listenedFingers[0].state === 'active') {
 
-                this._lastDistance = this._getFingersDistance();
-                this._startDistance = this._lastDistance;
-    
-                //target element is under the first finger
-                this.data.target = pFingerList[0].getTarget();   
-                this.fire(_super.EVENT_TYPE.start, this.data);
-            }
+                            this._addListenedFinger(pNewFinger);
+                      
+                            this._lastAngle = this._getFingersAngle();
+                            this._startAngle = this._lastAngle;
+
+                            this._lastDistance = this._getFingersDistance();
+                            this._startDistance = this._lastDistance;
+                            this.data.target = pNewFinger.getTarget(); 
+                            
+                            this.fire(_super.EVENT_TYPE.start, this.data);
+                        } 
+                        break;
+                }
+            } 
         },
 
         _onFingerUpdate: function(pFinger) {
-         
-            var newAngle = this._getFingersAngle();
-            this.data.totalRotation = this._startAngle - newAngle;
-            this.data.deltaRotation = this._lastAngle - newAngle;
-            this._lastAngle = newAngle;
+            
+            if(this.listenedFingers.length == 2) {
+            
+                var threshold = this.options.distanceThreshold*Utils.PPCM;
+                var newAngle = this._getFingersAngle();
+                this.data.totalRotation = this._startAngle - newAngle;
+                this.data.deltaRotation = this._lastAngle - newAngle;
+                this._lastAngle = newAngle;
 
-            var newDistance = this._getFingersDistance();
-            this.data.totalScale = newDistance / this._startDistance;
-            this.data.deltaScale = newDistance / this._lastDistance;
-            this.data.totalDistance = this._startDistance - newDistance;
-            this.data.deltaDistance = this._lastDistance - newDistance;
-            this._lastDistance = newDistance;
-          
-            if (this.data.rotate && Math.abs(this.data.totalRotation) > this.options.angleThreshold) {
-                this.data.scale = false;     
+                var newDistance = this._getFingersDistance();
+                this.data.totalScale = newDistance / this._startDistance;
+                this.data.deltaScale = newDistance / this._lastDistance;
+                this.data.totalDistance = this._startDistance - newDistance;
+                this.data.deltaDistance = this._lastDistance - newDistance;
+                this._lastDistance = newDistance;
+              
+                if (this.data.rotate && Math.abs(this.data.totalRotation) > this.options.angleThreshold) {
+                    this.data.scale = false;     
+                }
+
+                if (this.data.scale && Math.abs(this.data.totalDistance) > threshold) {
+                    this.data.rotate = false;
+                }
+
+                if (Math.abs(this.data.totalRotation) > this.options.angleThreshold || 
+                    Math.abs(this.data.totalDistance) > threshold) {
+                    this.fire(_super.EVENT_TYPE.move, this.data);  
+                }
             }
-
-            if (this.data.scale && Math.abs(this.data.totalDistance) > this._threshold) {
-                this.data.rotate = false;
-            }
-
-            if (Math.abs(this.data.totalRotation) > this.options.angleThreshold || 
-                Math.abs(this.data.totalDistance) > this._threshold) {
-                this.fire(_super.EVENT_TYPE.move, this.data);  
-            }
-
         },
 
         _onFingerRemoved: function(pFinger) {
-            this._removeAllListenedFingers();
-            this.fire(_super.EVENT_TYPE.end, this.data);  
+            switch (this.listenedFingers.length) {
+                case 1:
+                    pFinger._removeHandlerObject(this);
+                    this.listenedFingers.length = 0;
+                    this.isListening = false;
+                    break;
+                case 2:
+                    this._removeAllListenedFingers();
+
+                    this.fire(_super.EVENT_TYPE.end, this.data); 
+                    this.data.rotate = this.data.scale = true;
+                    break;
+                default: 
+                    this._removeAllListenedFingers();
+            } 
         },
 
         _getFingersAngle: function() {

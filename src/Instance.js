@@ -30,18 +30,6 @@ Instance.prototype = {
     element: null,
 
     /**
-     * @property fingerList
-     * @type {Array.<Finger>}
-     */
-    fingerList: null,
-
-    /**
-     * @property fingerCreatedMap
-     * @type {Object.<Number>, Finger>}
-     */
-    fingerCreatedMap: null,
-
-    /**
      * @property gestureList
      * @type {Array.<Gesture>}
      */
@@ -50,8 +38,6 @@ Instance.prototype = {
     /*---- INIT ----*/
     _init: function(pElement) {
         this.element = pElement;
-        this.fingerList = [];
-        this.fingerCreatedMap = {};
         this.gestureList = [];
         this.startListening();
     },
@@ -82,7 +68,7 @@ Instance.prototype = {
         for(var i = 0, size=this.gestureList.length; i<size; i++) {
             this.gestureList[i].removeAllHandlers();
         }
-        this.gestureList = [];
+        this.gestureList.length = 0;
     },
 
     /*---- Native event listening ----*/
@@ -112,7 +98,6 @@ Instance.prototype = {
     _stopListeningF: null,
     stopListening: function() {
         if(this._stopListeningF !== null) {
-            this._removeAllFingers(Date.now());
             this._stopListeningF();
             this._stopListeningF = null;
         }
@@ -120,10 +105,21 @@ Instance.prototype = {
 
     /*-------- Touch events ----*/
     _onTouchStart: function(pTouchEvent) {
-        var touch;
-        for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
-            touch = pTouchEvent.changedTouches[i];
-            this._createFinger(touch.identifier, pTouchEvent.timeStamp, touch.pageX, touch.pageY, this.getElement().id);
+        for(var i=0, size=pTouchEvent.changedTouches.length; i<size; i++) {
+            var touch = pTouchEvent.changedTouches[i];
+            var finger = null;
+            var pFingerId = touch.identifier;
+
+            if(Instance.FINGER_MAP[pFingerId] === undefined) {
+                finger = new Finger(pFingerId, Date.now(), touch.pageX, touch.pageY, this.getElement().id);
+                Instance.FINGER_MAP[pFingerId] = finger;
+            }  else {
+                finger = Instance.FINGER_MAP[pFingerId];
+            }
+
+            for(var j=0, size2=this.gestureList.length; j<size2; j++) {
+                this.gestureList[j]._onFingerAdded(finger);
+            }
         }
         pTouchEvent.preventDefault();
     },
@@ -132,92 +128,36 @@ Instance.prototype = {
         var touch;
         for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
             touch = pTouchEvent.changedTouches[i];
-            this._updateFingerPosition(touch.identifier, pTouchEvent.timeStamp, touch.pageX, touch.pageY);
+            var finger = Instance.FINGER_MAP[touch.identifier];
+            if(finger !== undefined) {
+                finger._setCurrentP(Date.now(), touch.pageX, touch.pageY, false);
+            }
         }
-
         pTouchEvent.preventDefault();
     },
 
-    
     _onTouchEnd: function(pTouchEvent) {
-        for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
-            // console.log('here I should remove the finger: ' + pTouchEvent.changedTouches[i].identifier);
-            // this._removeFinger(pTouchEvent.changedTouches[i].identifier, pTouchEvent.timeStamp);
-            this._removeFinger(pTouchEvent.changedTouches[i].identifier);
+        var finger = Instance.FINGER_MAP[pTouchEvent.changedTouches[0].identifier];
+        if(finger !== undefined) {
+            finger._setEndP(Date.now());
+            finger._clearHandlerObjects();
+            delete Instance.FINGER_MAP[finger.id];
         }
-        //FIXME: BEWARE OF OGRES AND THIS NASTY HACK that :/
-        // this is dirty nasty hack for cleaning the orphaned Finger objects
-        // TODO: try to fix me
-        // if (this.fingerList.length && Date.now()-this.fingerList[0].previousP.timestamp > Finger.CONSTANTS.inactivityTime) {
-        //     this._removeAllFingers();
-        // }
+        pTouchEvent.preventDefault();
     },
 
     _onTouchCancel: function(pTouchEvent) {
-        for(var i= 0, size=pTouchEvent.changedTouches.length; i<size; i++) {
+        for(var i=0, size=pTouchEvent.changedTouches.length; i<size; i++) {
             var finger = Instance.FINGER_MAP[pTouchEvent.changedTouches[i].identifier];
-            if(finger !== undefined && this._getFingerPosition(finger) !== -1) {
-                this._removeAllFingers();
+            if(finger !== undefined && this.fingerList.indexOf(finger) !== -1) {
+                finger._setEndP(Date.now());
+                finger._clearHandlerObjects();
+                delete Instance.FINGER_MAP[finger.id];
                 break;
             }
         }
-    },
-
-    /*---- Fingers ----*/
-    _createFinger: function(pFingerId, pTimestamp, pX, pY, target) {
-        var finger;
-        if(Instance.FINGER_MAP[pFingerId] === undefined) {
-            finger = new Finger(pFingerId, pTimestamp, pX, pY, target);
-            Instance.FINGER_MAP[pFingerId] = finger;
-            this.fingerCreatedMap[pFingerId] = finger;
-        }
-        else {
-            finger = Instance.FINGER_MAP[pFingerId];
-        }
-
-        this.fingerList.push(finger);
-
-        for(var i=0, size=this.gestureList.length; i<size; i++) {
-            this.gestureList[i]._onFingerAdded(finger, this.fingerList);
-        }
-    },
-
-    _removeFinger: function(pFingerId) {
-        var finger = Instance.FINGER_MAP[pFingerId];
-        if(finger !== undefined) {
-            this.fingerList.splice(this._getFingerPosition(finger), 1);
-            finger._setEndP(Date.now()-10);
-            finger._clearHandlerObjects();
-            delete this.fingerCreatedMap[finger.id];
-            delete Instance.FINGER_MAP[finger.id];
-        } else {
-            console.log('WHOOOPS, finger undefined! Cleaning the fingerList');
-            this.fingerList = [];
-        }
-    },
-
-    _removeAllFingers: function() {
-        var list = this.fingerList.splice(0);
-        for(var i=0, size=this.fingerList.length; i<size; i++) {
-            this._removeFinger(this.fingerList[i].id);
-        }
-    },
-
-    _updateFingerPosition: function(pFingerId, pTimestamp, pX, pY) {
-        //Only creator can update a finger
-        var finger = this.fingerCreatedMap[pFingerId];
-        if(finger !== undefined) {
-            finger._setCurrentP(pTimestamp, pX, pY, false);
-        }
-    },
-
-    /*---- utils ----*/
-    _getFingerPosition: function(pFinger) {
-        var index = this.fingerList.indexOf(pFinger);
-        // console.log(index, pFinger.id)
-        return index;
+        pTouchEvent.preventDefault();
     }
-
 };
 
 Fingers.Instance = Instance;

@@ -10,7 +10,7 @@ var Hold = (function (_super) {
    
     var DEFAULT_OPTIONS = {
         nbFingers: 1,
-        distanceThreshold: 1,  // in cm
+        distanceThreshold: 0.8,  // in cm
         duration: 600          // in ms
     };
 
@@ -25,52 +25,39 @@ var Hold = (function (_super) {
     Fingers.__extend(Hold.prototype, _super.prototype, {
 
         timer: null,
-        _threshold: DEFAULT_OPTIONS.distanceThreshold*Utils.PPCM,
 
-        _onFingerAdded: function(pNewFinger, pFingerList) {
-            if(!this.isListening && pFingerList.length >= this.options.nbFingers) {
-                for(var i=0; i<this.options.nbFingers; i++) {
-                    this._addListenedFinger(pFingerList[i]);
-                }
+        _onFingerAdded: function(pNewFinger) {
+            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
+                this._addListenedFinger(pNewFinger);
                 clearTimeout(this.timer);
                 this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
                 this.data.target = pNewFinger.getTarget();
-            }
-
-            if (this.listenedFingers.length+pFingerList.length-this.options.nbFingers > this.options.nbFingers) {
-                // console.log('too many fingers, removing hold: ' + pFingerList.length + ', ' + this.listenedFingers.length)
-                this._onHoldCancel();
-            }
+            } 
         },
 
         _onFingerUpdate: function(pFinger) {
-
-
-            // cancel when the distance threshold is overreached in at least one of the dimensions
-            if(Math.abs(pFinger.currentP.x - pFinger.startP.x) > this._threshold || 
-               Math.abs(pFinger.currentP.y - pFinger.startP.y) > this._threshold) {
+            var threshold = this.options.distanceThreshold*Utils.PPCM;
+            if(this.listenedFingers.length > 0 && this.listenedFingers[0].getDistance() > threshold) {
                 this._onHoldCancel();
-            }
-
-            for(var i = 0, size = this.listenedFingers.length; i<size; i++) {
-                if(this.listenedFingers[i].getDistance() > this._threshold) {
-                    this._onHoldCancel();
-                    break;
-                }
+                pFinger._removeHandlerObject(this);
             }
         },
 
         _onFingerRemoved: function(pFinger) {
+            pFinger._removeHandlerObject(this);
             this._onHoldCancel();
         },
 
         _onHoldTimeLeftF: null,
         _onHoldTimeLeft: function() {
             this.fire(_super.EVENT_TYPE.instant, this.data);
+            this._onHoldCancel();
         },
 
         _onHoldCancel: function() {
-            this._removeAllListenedFingers();
+            // console.log('hold canceled');
+            this.listenedFingers.length = 0;
+            this.isListening = false;
             clearTimeout(this.timer);
         }
     });

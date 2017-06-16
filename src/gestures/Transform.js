@@ -72,7 +72,7 @@ var Transform = (function (_super) {
 
         _onFingerUpdate: function(pFinger) {
             
-            if(this.listenedFingers.length == 2) {
+            if(this.listenedFingers.length === 2) {
             
                 var threshold = this.options.distanceThreshold*Utils.PPCM;
                 var newAngle = this._getFingersAngle();

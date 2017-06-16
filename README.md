@@ -2,18 +2,18 @@
 
 #### A javascript library for simultaneous touch gestures
 FingersJS is a small javascript library that detects and fire gesture events on DOM objects.<br/>
-This library detects __basic gestures__: Tap, Hold, Swipe, Pinch, Drag, Rotate, Scale.<br/>
+This library detects __basic gestures__: Tap, Hold, ~~Swipe~~, Pinch, Drag, Rotate, Scale.<br/>
 It also detects __multiple gestures on different objects in the same time__.
 
-FingerJS is partially re-written fork of the original [Fingers.js](https://github.com/paztis/fingers.js) library.
-
+FingerJS is ~~partially~~ vastly re-written fork of the original [Fingers.js](https://github.com/paztis/fingers.js) library. 
+Unlike the original fingers.js, the distance is recalculated to centimeters. The value is based on the PPI/DPI of the screen. For particular usage, it should be tweaked. Also note, that the documentation here shouldn't be up-to-date and I kindly suggest to check the code.
 
 ## Features
-- Light library (less than 15 kB minified and gzipped)
+- Light library (4kB minified and gzipped)
 - Works with touch devices (multiple fingers)
-- Detect action gestures (Tap, MultipleTap, Hold, Swipe, Pinch) with as many fingers as you want
+- Detect action gestures (Tap (one or more), Hold, ~~Swipe~~, Pinch)
 - Detect movement gestures (Drag, Rotate, Scale)
-- Detect raw gestures (Fingers object managed)
+- ~~Detect raw gestures (Fingers object managed)~~
 - __Multiple gestures in same time__ (You can drag 2 different objects, rotate a third and swipe a fourth in same time)
 - Easy to add your custom gestures.
 - AMD/CommonJS support
@@ -80,32 +80,31 @@ The following gestures are detected:
 
 - hold (1 .. N fingers), instant
 - tap (1 .. N fingers) and multiple taps (1 .. N successive taps), instant
-- swipe (1 .. N fingers), instant
+- ~~swipe (1 .. N fingers), instant~~
 - Pinch (1 .. N fingers), instant
 - drag (1 finger)
 - rotate (2 fingers)
 - scale (2 fingers)
 - transform (rotate and scale) (2 fingers)
-- raw (each finger is seen independently)
+- ~~raw (each finger is seen independently)~~
 
 
 ## Gesture Options and Data
+
 Each gesture has his set of options and manages its own data.
 
-### Raw gesture
+<!-- ### Raw gesture
 #### Options
     {
         nbMaxFingers: Number.MAX_VALUE
     };
-
+ -->
 
 ### Hold
 #### Options
     {
-        nbFingers: 1,
-        distanceThreshold: 0.5,         // in cm
+        distanceThreshold: 0.8,         // in cm
         duration: 600,                  // in ms
-        preventCombinedGestures: true
     };
 #### Data
 - target (name of the target element)
@@ -129,14 +128,12 @@ Each gesture has his set of options and manages its own data.
 ### Drag
 #### Options
     {
-        nbFingers: 1,
         distanceThreshold: 0.2,         // in cm
-        preventCombinedGestures: true
     }
 #### Data
 No data
 
-### Swipe
+<!-- ### Swipe
 #### Options
     {
         nbFingers: 1,
@@ -146,11 +143,11 @@ No data
 #### Data
 - direction (up, down, left, right)
 - velocity
-- target
+- target -->
 
 ### Pinch
 
-Pinch fires the event after the gesture is completed.
+Pinch fires the event after the gesture is completed. It is designed for 4 finger pinch (known e.g., from iPads)
 #### Options
     {
         pinchInDetect: 0.6,
@@ -161,7 +158,7 @@ Pinch fires the event after the gesture is completed.
 - scale
 - target
 
-### Rotate
+<!-- ### Rotate
 
 #### Options
     {
@@ -191,24 +188,31 @@ Note, that the angles are in degrees.
 
 #### Internal variables
 - ```_startDistance```
-- ```_lastDistance```
+- ```_lastDistance``` -->
 
 ### Transform
 #### Options
     {
-        distanceThreshold: 2.5,
-        angleThreshold: 4
+        distanceThreshold: 5,   // in cm
+        angleThreshold: 0.1     // in radians
     };
 #### Data
 - totalRotation
 - deltaRotation
 - totalDistance
 - deltaDistance
+- totalScale
+- deltaScale
+- scale
+- rotate
 - target
 
 #### Internal variables
 - ```_startDistance```
 - ```_lastDistance```
+- ```_startAngle```
+- ```_lastDistance```
+- ```_threshold```
 
 
 ## Usage
@@ -313,6 +317,6 @@ Its really easy to create you own ```Gesture```. You need to define its paramete
         });
 
 
-## Examples
+## Examples (outdated)
 Examples are available in [/tests/manual folder](/tests/manual).
 Try if on PC or on a Smartphone / Tablet with all your fingers, then enjoy it.

@@ -9,6 +9,7 @@ module.exports = function(grunt) {
                 ' * <%= pkg.homepage %>\n' +
                 ' *\n' +
                 ' * Copyright (c) <%= grunt.template.today("yyyy") %> <%= pkg.author.name %> <<%= pkg.author.email %>>;\n' +
+                ' * Based on original Fingers.js by Jérôme HENAFF <jerome.henaff@gmail.com>\n' + 
                 ' * Licensed under the MIT license */\n\n'
         },
         concat: {
@@ -30,7 +31,7 @@ module.exports = function(grunt) {
                     'src/gestures/module.js',
                     'src/gestures/Drag.js',
                     'src/gestures/Hold.js',
-                    //'src/gestures/Pinch.js',
+                    'src/gestures/Pinch.js',
                     //'src/gestures/Raw.js',
                     //'src/gestures/Swipe.js',
                     'src/gestures/Tap.js',

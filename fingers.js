@@ -1,7 +1,8 @@
-/*! FingersJS - v1.0.0 - 2017-06-09
- * https://github.com/vitekr/fingers.js
+/*! FingersJS - v1.6.0 - 2017-06-16
+ * https://github.com/vitekr/FingersJS
  *
  * Copyright (c) 2017 Vít Rusňák <vit.rusnak@gmail.com>;
+ * Based on original Fingers.js by Jérôme HENAFF <jerome.henaff@gmail.com>
  * Licensed under the MIT license */
 
 (function(window, undefined) {
@@ -41,7 +42,6 @@ var Utils = {
         IN: 'in',
         OUT: 'out'
     },
-
 
     // ppcm is based on dot-pitch value (useful calculator is here: https://www.sven.de/dpi/)
     // dot-pitch mac: 0.1119 mm => 1 cm ~ 90 px
@@ -253,7 +253,6 @@ Instance.prototype = {
 };
 
 Fingers.Instance = Instance;
-
 
 /**
  * @module fingers
@@ -487,8 +486,8 @@ var FingerUtils = {
 
     getFingersCenter: function(pFinger1, pFinger2) {
         return {
-            x: Math.round((pFinger1.currentP.x + pFinger2.currentP.x) / 2),
-            y: Math.round((pFinger1.currentP.y + pFinger2.currentP.y) / 2)
+            x: ~~((pFinger1.currentP.x + pFinger2.currentP.x) / 2),
+            y: ~~((pFinger1.currentP.y + pFinger2.currentP.y) / 2)
         };
     },
 
@@ -502,14 +501,15 @@ var FingerUtils = {
             center.x += arguments[i].currentP.x;
             center.y += arguments[i].currentP.y;
         }
-        center.x = Math.round(center.x / size);
-        center.y = Math.round(center.y / size);
+        center.x = ~~(center.x / size);
+        center.y = ~~(center.y / size);
 
         return center;
     }
 };
 
 Fingers.FingerUtils = FingerUtils;
+
 
 /**
  * @module fingers
@@ -581,11 +581,6 @@ Gesture.prototype = {
     _onFingerRemoved: function(pFinger) { /*To Override*/ },
 
     /*---- Actions ----*/
-    _addListenedFingers: function(pFinger1, pFinger2, pFinger3) {
-        for(var i=0, size=arguments.length; i<size; i++) {
-            this._addListenedFinger(arguments[i]);
-        }
-    },
 
     _addListenedFinger: function(pFinger) {
             this.listenedFingers.push(pFinger);
@@ -598,13 +593,12 @@ Gesture.prototype = {
 
     _removeListenedFinger: function(pFinger) {
 
+        // console.log('OFA: before ' + pNewFinger.id + ", " + pNewFinger.state, pNewFinger._handlerList);
         pFinger._removeHandlerObject(this);
-        index = this.listenedFingers.indexOf(pFinger);
-        this.listenedFingers.splice(index, 1);
+        // console.log('OFA after ' + pNewFinger.id + ", " + pNewFinger.state, pNewFinger._handlerList);
+        this.listenedFingers.length = 0;
+        this.isListening = false;
 
-        if(this.listenedFingers.length === 0) {
-            this.isListening = false;
-        }
     },
 
     _removeAllListenedFingers: function() {
@@ -621,9 +615,7 @@ Gesture.prototype = {
 };
 
 Fingers.Gesture = Gesture;
-
 Fingers.gesture = {};
-
 
 
 Fingers.gesture = {
@@ -640,7 +632,6 @@ Fingers.gesture = {
 var Drag = (function (_super) {
 
     var DEFAULT_OPTIONS = {
-        nbFingers: 1,
         distanceThreshold: 0.3,      // in cm
     };
 
@@ -650,23 +641,24 @@ var Drag = (function (_super) {
 
     Fingers.__extend(Drag.prototype, _super.prototype, {
 
-        _onFingerAdded: function(pNewFinger) {
+      _onFingerAdded: function(pNewFinger) {
 
-            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
-                this._addListenedFinger(pNewFinger);
-                this.fire(_super.EVENT_TYPE.start, null);
-            } 
-            
-            if(this.isListening && pNewFinger !== this.listenedFingers[0]) {
-               this.listenedFingers[0]._removeHandlerObject(this);
-                this.listenedFingers.length = 0;
-                this.isListening = false;
+            if(!this.isListening) {
+                if(this.listenedFingers.length === 0) {
+                    this._addListenedFinger(pNewFinger);
+                    this.fire(_super.EVENT_TYPE.start, null);
+                } else {
+                    this._removeListenedFinger(this.listenedFingers[0]);
+                }
+            } else {
+                if(this.listenedFingers.length > 0) {
+                    this._removeListenedFinger(this.listenedFingers[0]);
+                }
             }
         },
 
         _onFingerUpdate: function(pFinger) {
             var threshold = this.options.distanceThreshold*Utils.PPCM;
-            
             if(pFinger.getDeltaDistance() > threshold) {
                 this.fire(_super.EVENT_TYPE.move, null);
             }
@@ -674,9 +666,7 @@ var Drag = (function (_super) {
 
         _onFingerRemoved: function(pFinger) {
             this.fire(_super.EVENT_TYPE.end, null);
-            pFinger._removeHandlerObject(this);
-            this.listenedFingers.length = 0;
-            this.isListening = false;
+            this._removeListenedFinger(pFinger);
         }
     });
 
@@ -696,7 +686,6 @@ Fingers.gesture.Drag = Drag;
 var Hold = (function (_super) {
    
     var DEFAULT_OPTIONS = {
-        nbFingers: 1,
         distanceThreshold: 0.8,  // in cm
         duration: 600          // in ms
     };
@@ -714,11 +703,25 @@ var Hold = (function (_super) {
         timer: null,
 
         _onFingerAdded: function(pNewFinger) {
-            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
-                this._addListenedFinger(pNewFinger);
-                clearTimeout(this.timer);
-                this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
-                this.data.target = pNewFinger.getTarget();
+
+            if(!this.isListening) {
+                if(this.listenedFingers.length === 0) {
+                    this._addListenedFinger(pNewFinger);
+                    clearTimeout(this.timer);
+                    this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
+                    this.data.target = pNewFinger.getTarget();
+                } else {
+                    this.listenedFingers[0]._removeHandlerObject(this);
+                    this.listenedFingers.length = 0;
+                    clearTimeout(this.timer);
+                }
+            } else {
+                if(this.listenedFingers.length === 1) {
+                    this.listenedFingers[0]._removeHandlerObject(this);
+                    this._onHoldCancel();
+                    this.listenedFingers.length = 0;
+                    this.isListening = false;
+                }
             } 
         },
 
@@ -742,7 +745,6 @@ var Hold = (function (_super) {
         },
 
         _onHoldCancel: function() {
-            // console.log('hold canceled');
             this.listenedFingers.length = 0;
             this.isListening = false;
             clearTimeout(this.timer);
@@ -753,6 +755,99 @@ var Hold = (function (_super) {
 })(Fingers.Gesture);
 
 Fingers.gesture.Hold = Hold;
+
+/**
+ * @module gestures
+ *
+ * @class Pinch
+ * @constructor
+ * @param {Object} pOptions
+ * @return {Pinch}
+ */
+var Pinch = (function (_super) {
+
+    var DEFAULT_OPTIONS = {
+        pinchInDetect: 0.6,
+        pinchOutDetect: 1.4
+    };
+
+    function Pinch(pOptions) {
+        _super.call(this, pOptions, DEFAULT_OPTIONS);
+
+        this.data = {
+            grow: null,
+            scale: 1,
+            target: null
+        };
+    }
+
+    Fingers.__extend(Pinch.prototype, _super.prototype, {
+
+        _startDistance: 0,
+        data: null,
+
+        _onFingerAdded: function(pNewFinger) {
+
+            if(!this.isListening) {
+                if(this.listenedFingers.length < 3) {
+                    this._addListenedFinger(pNewFinger);
+                    this.isListening = false;
+                } else {
+                    if(this.listenedFingers[0].state === 'active' &&
+                       this.listenedFingers[1].state === 'active' &&
+                       this.listenedFingers[2].state === 'active') {
+                        this._addListenedFinger(pNewFinger);
+                        this._startDistance = this._getFingersDistance();
+                        this.data.target = pNewFinger.getTarget();
+                        this.fire(_super.EVENT_TYPE.start, this.data);
+                    } else {
+                        this._removeAllListenedFingers();
+                    }
+                }
+            } else {
+                this._removeAllListenedFingers();
+            }
+        },
+
+        _onFingerUpdate: function(pFinger) {},
+
+        _onFingerRemoved: function(pFinger) {
+
+            switch (this.listenedFingers.length) {
+                case 1:
+                case 2:
+                case 3:
+                    pFinger._removeHandlerObject(this);
+                    this.listenedFingers.length = 0;
+                    this.isListening = false;
+                    break;
+                case 4:
+
+                    var newDistance = this._getFingersDistance();
+                    var scale = newDistance / this._startDistance;
+
+                    if(scale <= this.options.pinchInDetect || scale >= this.options.pinchOutDetect) {
+                        this.data.grow = (scale > 1) ? Utils.GROW.OUT : Utils.GROW.IN;
+                        this.data.scale = scale;
+                        this.fire(_super.EVENT_TYPE.instant, this.data);
+                    }
+                    break;
+                default: 
+                    this._removeAllListenedFingers();
+            } 
+        },
+
+        _getFingersDistance: function() {
+            var finger1P = this.listenedFingers[0].currentP;
+            var finger2P = this.listenedFingers[1].currentP;
+            return Fingers.Utils.getDistance(finger2P.x - finger1P.x, finger2P.y - finger1P.y);
+        }
+    });
+
+    return Pinch;
+})(Fingers.Gesture);
+
+Fingers.gesture.Pinch = Pinch;
 
 /**
  * @module gestures
@@ -768,9 +863,8 @@ var Tap = (function (_super) {
         nbFingers: 1,
         nbTapMin: 1,
         nbTapMax: 1,
-        tapInterval: 180,
-        tapDuration: 50,
-        distanceThreshold: 0.4  // in cm
+        tapInterval: 200,
+        distanceThreshold: 0.6  // in cm
     };
 
     function Tap(pOptions) {
@@ -786,53 +880,37 @@ var Tap = (function (_super) {
     Fingers.__extend(Tap.prototype, _super.prototype, {
 
         data: null,
+        _distance: 0,
+        _threshold: 0,
+        _delay: 0,
 
         _onFingerAdded: function(pNewFinger) {
-
-            if(this.isListening && this.listenedFingers.length == 1) {
-                pNewFinger._removeHandlerObject(this);
-                this.listenedFingers.length = 0;
-                this.isListening = false;
+            this._delay = pNewFinger.getTime() - this.data.lastTapTimestamp;
+            if(this._delay > this.options.tapInterval) { // First tap
+                this.data.lastTapTimestamp = pNewFinger.getTime();
+                this.data.nbTap = 0;
+                this._threshold = this.options.distanceThreshold*Utils.PPCM;
+                this.data.tapPosition = [pNewFinger.getX(), pNewFinger.getY()];
+                this.data.target = pNewFinger.getTarget();
+            } else { // Second tap
+                this._distance = Fingers.Utils.getDistance(pNewFinger.getX() - this.data.tapPosition[0], pNewFinger.getY() - this.data.tapPosition[1]);
             }
-            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) { 
-
-                if((pNewFinger.getTime() - this.data.lastTapTimestamp) > this.options.tapInterval) {
-                    this.data.lastTapTimestamp = 0;
-                    this.data.nbTap = 0;
-                }
-                this._addListenedFinger(pNewFinger);
-            } 
+            this._addListenedFinger(pNewFinger);
         },
 
         _onFingerUpdate: function(pFinger) {
-
-            if (pFinger.getTotalTime() > this.options.tapInterval &&
-               pFinger.getDistance() > this.options.distanceThreshold*Utils.PPCM) {
-                pFinger._removeHandlerObject(this);
-                this.listenedFingers.length = 0;
-                this.isListening = false;
+            if(pFinger.getDistance() > this._threshold) {
+                this._removeListenedFinger(pFinger);
             }
         },
 
         _onFingerRemoved: function(pFinger) {
-
-            pFinger._removeHandlerObject(this);
-            this.listenedFingers.length = 0;
-            this.isListening = false;
-                             
-            if (pFinger.getTotalTime() < this.options.tapInterval &&
-               pFinger.getDistance() < this.options.distanceThreshold*Utils.PPCM) {
-                this.data.lastTapTimestamp = pFinger.getTime();
-                
-                this.data.nbTap++;
-                if (this.data.nbTap >= this.options.nbTapMin &&  
-                    this.data.nbTap <= this.options.nbTapMax) {
-                    this.data.tapPosition = [pFinger.getX(), pFinger.getY()];
-                    this.data.target = pFinger.getTarget();
+            this._removeListenedFinger(pFinger);
+            this.data.nbTap++;
+            if (this._delay < this.options.tapInterval && this._distance < this._threshold && 
+                this.data.nbTap >= this.options.nbTapMin && this.data.nbTap <= this.options.nbTapMax) {
                     this.fire(_super.EVENT_TYPE.instant, this.data);
-
-                } 
-            }
+            } 
         }
     });
 
@@ -853,7 +931,7 @@ Fingers.gesture.Tap = Tap;
 var Transform = (function (_super) {
     var DEFAULT_OPTIONS = {
         distanceThreshold: 5,   // in cm
-        angleThreshold: 0.13    // in rad
+        angleThreshold: 0.1    // in rad
     };
 
     function Transform(pOptions) {
@@ -882,37 +960,35 @@ var Transform = (function (_super) {
         data: null,
 
         _onFingerAdded: function(pNewFinger) {
-
-            if(this.listenedFingers.length == 2) {
-                this._removeAllListenedFingers();
-            }
         
-            if(!this.isListening && this.listenedFingers.length >= 0) {
 
-                switch(this.listenedFingers.length) {
-                    case 0:
+            if(!this.isListening) {
+
+                if(this.listenedFingers.length === 0) {
                         this._addListenedFinger(pNewFinger);
                         this.isListening = false;
                         this.options.scale = true;
                         this.options.rotate = true;
-                        break;
-                    case 1:
-                        if(this.listenedFingers[0].state === 'active') {
+                } else {
+                    if(this.listenedFingers[0].state === 'active') {
 
-                            this._addListenedFinger(pNewFinger);
+                        this._addListenedFinger(pNewFinger);
                       
-                            this._lastAngle = this._getFingersAngle();
-                            this._startAngle = this._lastAngle;
+                        this._lastAngle = this._getFingersAngle();
+                        this._startAngle = this._lastAngle;
 
-                            this._lastDistance = this._getFingersDistance();
-                            this._startDistance = this._lastDistance;
-                            this.data.target = pNewFinger.getTarget(); 
+                        this._lastDistance = this._getFingersDistance();
+                        this._startDistance = this._lastDistance;
+                        this.data.target = pNewFinger.getTarget(); 
                             
-                            this.fire(_super.EVENT_TYPE.start, this.data);
-                        } 
-                        break;
+                        this.fire(_super.EVENT_TYPE.start, this.data);
+                    } else {
+                        this._removeAllListenedFingers();
+                    }
                 }
-            } 
+            } else {
+                this._removeAllListenedFingers();
+            }
         },
 
         _onFingerUpdate: function(pFinger) {
@@ -932,16 +1008,17 @@ var Transform = (function (_super) {
                 this.data.deltaDistance = this._lastDistance - newDistance;
                 this._lastDistance = newDistance;
               
-                if (this.data.rotate && Math.abs(this.data.totalRotation) > this.options.angleThreshold) {
+                // Instead of Math.abs(this.data.totalRotation), it should be faster
+                var totrot = (this.data.totalRotation ^ (this.data.totalRotation >> 31)) - (this.data.totalRotation >> 31);
+                var totdist = (this.data.totalDistance ^ (this.data.totalDistance >> 31)) - (this.data.totalDistance >> 31);
+
+                if (this.data.rotate && totrot > this.options.angleThreshold) {
                     this.data.scale = false;     
                 }
-
-                if (this.data.scale && Math.abs(this.data.totalDistance) > threshold) {
+                if (this.data.scale && totdist > threshold) {
                     this.data.rotate = false;
                 }
-
-                if (Math.abs(this.data.totalRotation) > this.options.angleThreshold || 
-                    Math.abs(this.data.totalDistance) > threshold) {
+                if (!(this.data.rotate && this.data.scale)) {
                     this.fire(_super.EVENT_TYPE.move, this.data);  
                 }
             }
@@ -956,7 +1033,6 @@ var Transform = (function (_super) {
                     break;
                 case 2:
                     this._removeAllListenedFingers();
-
                     this.fire(_super.EVENT_TYPE.end, this.data); 
                     this.data.rotate = this.data.scale = true;
                     break;

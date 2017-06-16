@@ -1,9 +1,9 @@
 {
   "name": "fingersjs",
   "title": "FingersJS",
-  "description": "A javascript library for synchronous touch gestures. Based on the Fingers.js by Jérôme HENAFF",
-  "homepage": "https://github.com/vitekr/fingers.js",
-  "version": "1.0.0",
+  "description": "Minimalistic javascript library for touch gestures. Based on the original Fingers.js by Jérôme HENAFF <jerome.henaff@gmail.com>",
+  "homepage": "https://github.com/vitekr/FingersJS",
+  "version": "1.6.0",
   "author": {
     "name": "Vít Rusňák",
     "email": "vit.rusnak@gmail.com"

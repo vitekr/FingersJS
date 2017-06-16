@@ -16,8 +16,8 @@ var FingerUtils = {
 
     getFingersCenter: function(pFinger1, pFinger2) {
         return {
-            x: Math.round((pFinger1.currentP.x + pFinger2.currentP.x) / 2),
-            y: Math.round((pFinger1.currentP.y + pFinger2.currentP.y) / 2)
+            x: ~~((pFinger1.currentP.x + pFinger2.currentP.x) / 2),
+            y: ~~((pFinger1.currentP.y + pFinger2.currentP.y) / 2)
         };
     },
 
@@ -31,8 +31,8 @@ var FingerUtils = {
             center.x += arguments[i].currentP.x;
             center.y += arguments[i].currentP.y;
         }
-        center.x = Math.round(center.x / size);
-        center.y = Math.round(center.y / size);
+        center.x = ~~(center.x / size);
+        center.y = ~~(center.y / size);
 
         return center;
     }

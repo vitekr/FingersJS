@@ -18,7 +18,6 @@ var Utils = {
         OUT: 'out'
     },
 
-
     // ppcm is based on dot-pitch value (useful calculator is here: https://www.sven.de/dpi/)
     // dot-pitch mac: 0.1119 mm => 1 cm ~ 90 px
     // dot-pitch mac(percieved): 0.1989 => 1 cm ~ 50px

@@ -9,7 +9,6 @@
 var Drag = (function (_super) {
 
     var DEFAULT_OPTIONS = {
-        nbFingers: 1,
         distanceThreshold: 0.3,      // in cm
     };
 
@@ -19,23 +18,24 @@ var Drag = (function (_super) {
 
     Fingers.__extend(Drag.prototype, _super.prototype, {
 
-        _onFingerAdded: function(pNewFinger) {
+      _onFingerAdded: function(pNewFinger) {
 
-            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
-                this._addListenedFinger(pNewFinger);
-                this.fire(_super.EVENT_TYPE.start, null);
-            } 
-            
-            if(this.isListening && pNewFinger !== this.listenedFingers[0]) {
-               this.listenedFingers[0]._removeHandlerObject(this);
-                this.listenedFingers.length = 0;
-                this.isListening = false;
+            if(!this.isListening) {
+                if(this.listenedFingers.length === 0) {
+                    this._addListenedFinger(pNewFinger);
+                    this.fire(_super.EVENT_TYPE.start, null);
+                } else {
+                    this._removeListenedFinger(this.listenedFingers[0]);
+                }
+            } else {
+                if(this.listenedFingers.length > 0) {
+                    this._removeListenedFinger(this.listenedFingers[0]);
+                }
             }
         },
 
         _onFingerUpdate: function(pFinger) {
             var threshold = this.options.distanceThreshold*Utils.PPCM;
-            
             if(pFinger.getDeltaDistance() > threshold) {
                 this.fire(_super.EVENT_TYPE.move, null);
             }
@@ -43,9 +43,7 @@ var Drag = (function (_super) {
 
         _onFingerRemoved: function(pFinger) {
             this.fire(_super.EVENT_TYPE.end, null);
-            pFinger._removeHandlerObject(this);
-            this.listenedFingers.length = 0;
-            this.isListening = false;
+            this._removeListenedFinger(pFinger);
         }
     });
 

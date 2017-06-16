@@ -10,7 +10,7 @@
 var Transform = (function (_super) {
     var DEFAULT_OPTIONS = {
         distanceThreshold: 5,   // in cm
-        angleThreshold: 0.13    // in rad
+        angleThreshold: 0.1    // in rad
     };
 
     function Transform(pOptions) {
@@ -39,37 +39,35 @@ var Transform = (function (_super) {
         data: null,
 
         _onFingerAdded: function(pNewFinger) {
-
-            if(this.listenedFingers.length == 2) {
-                this._removeAllListenedFingers();
-            }
         
-            if(!this.isListening && this.listenedFingers.length >= 0) {
 
-                switch(this.listenedFingers.length) {
-                    case 0:
+            if(!this.isListening) {
+
+                if(this.listenedFingers.length === 0) {
                         this._addListenedFinger(pNewFinger);
                         this.isListening = false;
                         this.options.scale = true;
                         this.options.rotate = true;
-                        break;
-                    case 1:
-                        if(this.listenedFingers[0].state === 'active') {
+                } else {
+                    if(this.listenedFingers[0].state === 'active') {
 
-                            this._addListenedFinger(pNewFinger);
+                        this._addListenedFinger(pNewFinger);
                       
-                            this._lastAngle = this._getFingersAngle();
-                            this._startAngle = this._lastAngle;
+                        this._lastAngle = this._getFingersAngle();
+                        this._startAngle = this._lastAngle;
 
-                            this._lastDistance = this._getFingersDistance();
-                            this._startDistance = this._lastDistance;
-                            this.data.target = pNewFinger.getTarget(); 
+                        this._lastDistance = this._getFingersDistance();
+                        this._startDistance = this._lastDistance;
+                        this.data.target = pNewFinger.getTarget(); 
                             
-                            this.fire(_super.EVENT_TYPE.start, this.data);
-                        } 
-                        break;
+                        this.fire(_super.EVENT_TYPE.start, this.data);
+                    } else {
+                        this._removeAllListenedFingers();
+                    }
                 }
-            } 
+            } else {
+                this._removeAllListenedFingers();
+            }
         },
 
         _onFingerUpdate: function(pFinger) {
@@ -89,16 +87,17 @@ var Transform = (function (_super) {
                 this.data.deltaDistance = this._lastDistance - newDistance;
                 this._lastDistance = newDistance;
               
-                if (this.data.rotate && Math.abs(this.data.totalRotation) > this.options.angleThreshold) {
+                // Instead of Math.abs(this.data.totalRotation), it should be faster
+                var totrot = (this.data.totalRotation ^ (this.data.totalRotation >> 31)) - (this.data.totalRotation >> 31);
+                var totdist = (this.data.totalDistance ^ (this.data.totalDistance >> 31)) - (this.data.totalDistance >> 31);
+
+                if (this.data.rotate && totrot > this.options.angleThreshold) {
                     this.data.scale = false;     
                 }
-
-                if (this.data.scale && Math.abs(this.data.totalDistance) > threshold) {
+                if (this.data.scale && totdist > threshold) {
                     this.data.rotate = false;
                 }
-
-                if (Math.abs(this.data.totalRotation) > this.options.angleThreshold || 
-                    Math.abs(this.data.totalDistance) > threshold) {
+                if (!(this.data.rotate && this.data.scale)) {
                     this.fire(_super.EVENT_TYPE.move, this.data);  
                 }
             }
@@ -113,7 +112,6 @@ var Transform = (function (_super) {
                     break;
                 case 2:
                     this._removeAllListenedFingers();
-
                     this.fire(_super.EVENT_TYPE.end, this.data); 
                     this.data.rotate = this.data.scale = true;
                     break;

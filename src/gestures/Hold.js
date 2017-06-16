@@ -9,7 +9,6 @@
 var Hold = (function (_super) {
    
     var DEFAULT_OPTIONS = {
-        nbFingers: 1,
         distanceThreshold: 0.8,  // in cm
         duration: 600          // in ms
     };
@@ -27,11 +26,25 @@ var Hold = (function (_super) {
         timer: null,
 
         _onFingerAdded: function(pNewFinger) {
-            if(!this.isListening && this.listenedFingers.length < this.options.nbFingers) {
-                this._addListenedFinger(pNewFinger);
-                clearTimeout(this.timer);
-                this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
-                this.data.target = pNewFinger.getTarget();
+
+            if(!this.isListening) {
+                if(this.listenedFingers.length === 0) {
+                    this._addListenedFinger(pNewFinger);
+                    clearTimeout(this.timer);
+                    this.timer = setTimeout(this._onHoldTimeLeftF, this.options.duration);
+                    this.data.target = pNewFinger.getTarget();
+                } else {
+                    this.listenedFingers[0]._removeHandlerObject(this);
+                    this.listenedFingers.length = 0;
+                    clearTimeout(this.timer);
+                }
+            } else {
+                if(this.listenedFingers.length === 1) {
+                    this.listenedFingers[0]._removeHandlerObject(this);
+                    this._onHoldCancel();
+                    this.listenedFingers.length = 0;
+                    this.isListening = false;
+                }
             } 
         },
 
@@ -55,7 +68,6 @@ var Hold = (function (_super) {
         },
 
         _onHoldCancel: function() {
-            // console.log('hold canceled');
             this.listenedFingers.length = 0;
             this.isListening = false;
             clearTimeout(this.timer);

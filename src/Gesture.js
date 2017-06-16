@@ -68,11 +68,6 @@ Gesture.prototype = {
     _onFingerRemoved: function(pFinger) { /*To Override*/ },
 
     /*---- Actions ----*/
-    _addListenedFingers: function(pFinger1, pFinger2, pFinger3) {
-        for(var i=0, size=arguments.length; i<size; i++) {
-            this._addListenedFinger(arguments[i]);
-        }
-    },
 
     _addListenedFinger: function(pFinger) {
             this.listenedFingers.push(pFinger);
@@ -85,13 +80,12 @@ Gesture.prototype = {
 
     _removeListenedFinger: function(pFinger) {
 
+        // console.log('OFA: before ' + pNewFinger.id + ", " + pNewFinger.state, pNewFinger._handlerList);
         pFinger._removeHandlerObject(this);
-        index = this.listenedFingers.indexOf(pFinger);
-        this.listenedFingers.splice(index, 1);
+        // console.log('OFA after ' + pNewFinger.id + ", " + pNewFinger.state, pNewFinger._handlerList);
+        this.listenedFingers.length = 0;
+        this.isListening = false;
 
-        if(this.listenedFingers.length === 0) {
-            this.isListening = false;
-        }
     },
 
     _removeAllListenedFingers: function() {
@@ -108,5 +102,4 @@ Gesture.prototype = {
 };
 
 Fingers.Gesture = Gesture;
-
 Fingers.gesture = {};
